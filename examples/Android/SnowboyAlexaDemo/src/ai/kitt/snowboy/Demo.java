@@ -24,6 +24,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Context;
 
+import com.amazonaws.mobile.auth.core.IdentityManager;
+import com.amazonaws.mobile.auth.core.SignInStateChangeListener;
 import com.amazonaws.mobile.client.AWSMobileClient;
 import com.amazonaws.mobile.client.AWSStartupHandler;
 import com.amazonaws.mobile.client.AWSStartupResult;
@@ -44,6 +46,7 @@ public class Demo extends Activity {
     PowerManager.WakeLock wakeLock;
     private int preVolume = -1;
     Intent serviceIntent;
+    Boolean record_started = false;
     AudioService audioservice ;
 
     @Override
@@ -82,6 +85,18 @@ public class Demo extends Activity {
         // Stop the session and submit the default app started event
         pinpointManager.getSessionClient().stopSession();
         pinpointManager.getAnalyticsClient().submitEvents();
+
+        IdentityManager.getDefaultIdentityManager().addSignInStateChangeListener(new SignInStateChangeListener() {
+            @Override
+            public void onUserSignedIn() {
+                Log.d("[Log]", "User Signed In");
+            }
+
+            @Override
+            public void onUserSignedOut() {
+                Log.d("[Log]", "User Signed Out");
+            }
+        });
     }
 
     private ServiceConnection mConnection = new ServiceConnection() {
@@ -132,6 +147,7 @@ public class Demo extends Activity {
     }
 
     private void startRecording() {
+        record_started = true;
         startService(serviceIntent);
         bindService(serviceIntent, mConnection, Context.BIND_AUTO_CREATE); //Binding to the service!
         updateLog(" ----> recording started ...", "green");
@@ -139,6 +155,7 @@ public class Demo extends Activity {
     }
 
     private void stopRecording() {
+        record_started = false;
         unbindService(mConnection);
         stopService(serviceIntent);
         updateLog(" ----> recording stopped ", "green");
@@ -146,16 +163,18 @@ public class Demo extends Activity {
     }
 
     private void startPlayback() {
-        updateLog(" ----> playback started ...", "green");
-        play_button.setText(R.string.btn2_stop);
-
+        updateLog(" ----> user sign out ...", "green");
+        IdentityManager.getDefaultIdentityManager().signOut();
+        Intent myIntent = new Intent(Demo.this, AuthenticatorActivity.class);
+        Demo.this.startActivity(myIntent);
     }
 
-    private void stopPlayback() {
-        updateLog(" ----> playback stopped ", "green");
-        play_button.setText(R.string.btn2_start);
-
-    }
+//
+//    private void stopPlayback() {
+//        updateLog(" ----> playback stopped ", "green");
+//        play_button.setText(R.string.btn2_start);
+//
+//    }
 
     private void sleep() {
         try { Thread.sleep(500);
@@ -166,12 +185,13 @@ public class Demo extends Activity {
         // @Override
         public void onClick(View arg0) {
             if(record_button.getText().equals(getResources().getString(R.string.btn1_start))) {
-                stopPlayback();
                 sleep();
                 startRecording();
             } else {
-                stopRecording();
-                sleep();
+                if (record_started) {
+                    stopRecording();
+                    sleep();
+                }
             }
         }
     };
@@ -180,11 +200,11 @@ public class Demo extends Activity {
         // @Override
         public void onClick(View arg0) {
             if (play_button.getText().equals(getResources().getString(R.string.btn2_start))) {
-                stopRecording();
-                sleep();
+                if (record_started) {
+                    stopRecording();
+                    sleep();
+                }
                 startPlayback();
-            } else {
-                stopPlayback();
             }
         }
     };
