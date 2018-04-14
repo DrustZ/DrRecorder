@@ -4,7 +4,9 @@ import android.app.Activity;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.AudioManager;
+import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
@@ -27,6 +29,10 @@ import java.util.Locale;
 import ai.kitt.snowboy.Constants;
 import ai.kitt.snowboy.MsgEnum;
 import ai.kitt.snowboy.demo.R;
+
+import com.amazonaws.mobile.client.AWSMobileClient;
+import com.amazonaws.mobileconnectors.s3.transferutility.*;
+import com.amazonaws.services.s3.AmazonS3Client;
 
 public class AudioService extends Service {
     static String strLog = null;
@@ -73,12 +79,19 @@ public class AudioService extends Service {
                     if (keywordDetected) {
                         conversationStarted = true;
                         keywordDetected = false;
-                        String fn = currentPath.replace("pcm", "wav");
-                        try {
-                            rawToWave(new File(currentPath), new File(fn));
-                        } catch (Exception e){
-                            e.printStackTrace();
-                        }
+                        AsyncTask.execute(new Runnable() {
+                                @Override
+                                public void run() {
+                                    //TODO your background code
+                                    String fn = currentPath.replace("pcm", "wav");
+                                    try {
+                                        rawToWave(currentPath, fn);
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                        });
+
                         Log.d("[Log]", "file detected!!!");
                     }
 
@@ -149,6 +162,7 @@ public class AudioService extends Service {
     }
 
     public void StartRunning(){
+        AWSMobileClient.getInstance().initialize(this.activity).execute();
         mStatusChecker.run();
     }
 
@@ -203,8 +217,9 @@ public class AudioService extends Service {
         return fn;
     }
 
-    private void rawToWave(final File rawFile, final File waveFile) throws IOException {
-
+    private void rawToWave(String rawfn, String wavefn) throws IOException {
+        File rawFile = new File(rawfn);
+        File waveFile = new File(wavefn);
         byte[] rawData = new byte[(int) rawFile.length()];
         DataInputStream input = null;
         try {
@@ -246,6 +261,7 @@ public class AudioService extends Service {
         } finally {
             if (output != null) {
                 output.close();
+                uploadWithTransferUtility(wavefn);
             }
         }
     }
@@ -289,5 +305,56 @@ public class AudioService extends Service {
         for (int i = 0; i < value.length(); i++) {
             output.write(value.charAt(i));
         }
+    }
+
+    //upload
+    public void uploadWithTransferUtility(final String fn) {
+
+        TransferUtility transferUtility =
+                TransferUtility.builder()
+                        .context(getApplicationContext())
+                        .awsConfiguration(AWSMobileClient.getInstance().getConfiguration())
+                        .s3Client(new AmazonS3Client(AWSMobileClient.getInstance().getCredentialsProvider()))
+                        .build();
+
+        SharedPreferences prefs = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE);
+        String prefix = prefs.getString("prefix", null);
+        if (prefix == null)
+            prefix = "";
+
+        String uploadname = "s3Folder/" + prefix + fn.substring(fn.lastIndexOf("/")+1);
+        TransferObserver uploadObserver =
+                transferUtility.upload(
+                        uploadname,
+                        new File(fn));
+
+        // Attach a listener to the observer to get state update and progress notifications
+        uploadObserver.setTransferListener(new TransferListener() {
+
+            @Override
+            public void onStateChanged(int id, TransferState state) {
+                if (TransferState.COMPLETED == state) {
+                    // Handle a completed upload.
+                    File file = new File(fn);
+                    file.delete();
+                    Log.d("Log", "Upload finished!");
+                }
+            }
+
+            @Override
+            public void onProgressChanged(int id, long bytesCurrent, long bytesTotal) {
+                float percentDonef = ((float) bytesCurrent / (float) bytesTotal) * 100;
+                int percentDone = (int)percentDonef;
+
+                Log.d("YourActivity", "ID:" + id + " bytesCurrent: " + bytesCurrent
+                        + " bytesTotal: " + bytesTotal + " " + percentDone + "%");
+            }
+
+            @Override
+            public void onError(int id, Exception ex) {
+                // Handle errors
+            }
+
+        });
     }
 }

@@ -8,6 +8,7 @@ import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -19,11 +20,16 @@ import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Context;
 
+import com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUser;
+import com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUserDetails;
+import com.amazonaws.mobileconnectors.cognitoidentityprovider.handlers.GetDetailsHandler;
+import com.amazonaws.mobileconnectors.s3.transferutility.*;
 import com.amazonaws.mobile.auth.core.IdentityManager;
 import com.amazonaws.mobile.auth.core.SignInStateChangeListener;
 import com.amazonaws.mobile.client.AWSMobileClient;
@@ -31,6 +37,9 @@ import com.amazonaws.mobile.client.AWSStartupHandler;
 import com.amazonaws.mobile.client.AWSStartupResult;
 import com.amazonaws.mobileconnectors.pinpoint.PinpointConfiguration;
 import com.amazonaws.mobileconnectors.pinpoint.PinpointManager;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import ai.kitt.snowboy.audio.AudioDataSaver;
 import ai.kitt.snowboy.demo.R;
@@ -40,6 +49,8 @@ public class Demo extends Activity {
     public static PinpointManager pinpointManager;
     private Button record_button;
     private Button play_button;
+    private Button prefix_button;
+    private EditText editText;
     private TextView log;
     private ScrollView logView;
     static String strLog = null;
@@ -90,6 +101,23 @@ public class Demo extends Activity {
             @Override
             public void onUserSignedIn() {
                 Log.d("[Log]", "User Signed In");
+
+                GetDetailsHandler getDetailsHandler = new GetDetailsHandler() {
+                    @Override
+                    public void onSuccess(CognitoUserDetails cognitoUserDetails) {
+                        // The user detail are in cognitoUserDetails
+
+                        // Fetch the user details
+                        Map userAtts=new HashMap();
+                        userAtts =cognitoUserDetails.getAttributes().getAttributes();
+                        String userName = userAtts.get("alias:preferred_username").toString();
+                    }
+
+                    @Override
+                    public void onFailure(Exception exception) {
+                        // Fetch user details failed, check exception for the cause
+                    }
+                };
             }
 
             @Override
@@ -133,6 +161,27 @@ public class Demo extends Activity {
 
         log = (TextView)findViewById(R.id.log);
         logView = (ScrollView)findViewById(R.id.logView);
+
+        editText = (EditText) findViewById(R.id.prefixEdit);
+        prefix_button = (Button) findViewById(R.id.prefixBtn);
+        prefix_button.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                String prefix = editText.getText().toString();
+                prefix = prefix.trim();
+                if (!prefix.isEmpty()){
+                    SharedPreferences.Editor editor = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE).edit();
+                    editor.putString("prefix", prefix);
+                    editor.apply();
+                }
+                editText.clearFocus();
+            }
+        });
+
+        SharedPreferences prefs = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE);
+        String prefix = prefs.getString("prefix", null);
+        if (prefix != null)
+            editText.setText(prefix);
     }
     
     private void setMaxVolume() {
