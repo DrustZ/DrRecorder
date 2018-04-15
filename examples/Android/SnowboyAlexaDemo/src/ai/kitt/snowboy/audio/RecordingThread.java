@@ -22,7 +22,8 @@ public class RecordingThread {
     private static final String TAG = RecordingThread.class.getSimpleName();
 
     private static final String ACTIVE_RES = Constants.ACTIVE_RES;
-    private static final String ACTIVE_UMDL = Constants.ACTIVE_UMDL;
+    private static final String ACTIVE_UMDL_ALEXA = Constants.ACTIVE_UMDL_ALEXA;
+    private static final String ACTIVE_UMDL_GOOGLE = Constants.ACTIVE_UMDL_GOOGLE;
     
     private boolean shouldContinue;
     private AudioDataReceivedListener listener = null;
@@ -30,17 +31,18 @@ public class RecordingThread {
     private Thread thread;
     
     private static String strEnvWorkSpace = Constants.DEFAULT_WORK_SPACE;
-    private String activeModel = strEnvWorkSpace+ACTIVE_UMDL;    
+    private String activeModel_alexa = strEnvWorkSpace+ACTIVE_UMDL_ALEXA;
+    private String activeModel_google = strEnvWorkSpace+ACTIVE_UMDL_GOOGLE;
     private String commonRes = strEnvWorkSpace+ACTIVE_RES;   
     
-    private SnowboyDetect detector = new SnowboyDetect(commonRes, activeModel);
+    private SnowboyDetect detector = new SnowboyDetect(commonRes, activeModel_alexa+","+activeModel_google);
     private MediaPlayer player = new MediaPlayer();
 
     public RecordingThread(Handler handler, AudioDataReceivedListener listener) {
         this.handler = handler;
         this.listener = listener;
 
-        detector.SetSensitivity("0.6");
+        detector.SetSensitivity("0.65,0.505");
         detector.SetAudioGain(1);
         detector.ApplyFrontend(true);
         try {

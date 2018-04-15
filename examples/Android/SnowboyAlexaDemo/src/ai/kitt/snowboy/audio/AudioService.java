@@ -211,7 +211,7 @@ public class AudioService extends Service {
     private String getOutputFile() {
         SimpleDateFormat dateFormat = new SimpleDateFormat
                 ("MMdd_HH_mm_ss", Locale.US);
-        String fn = Constants.DEFAULT_WORK_SPACE + "/RECORDING_"
+        String fn = Constants.DEFAULT_WORK_SPACE + "/"
                 + dateFormat.format(new Date())
                 + ".pcm";
         return fn;
@@ -322,7 +322,7 @@ public class AudioService extends Service {
         if (prefix == null)
             prefix = "";
 
-        String uploadname = "s3Folder/" + prefix + fn.substring(fn.lastIndexOf("/")+1);
+        String uploadname = "s3Folder/" + prefix + "_" + fn.substring(fn.lastIndexOf("/")+1);
         TransferObserver uploadObserver =
                 transferUtility.upload(
                         uploadname,
