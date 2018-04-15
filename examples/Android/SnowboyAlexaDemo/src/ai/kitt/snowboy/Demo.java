@@ -44,7 +44,6 @@ import java.util.Map;
 import ai.kitt.snowboy.audio.AudioDataSaver;
 import ai.kitt.snowboy.demo.R;
 
-
 public class Demo extends Activity {
     public static PinpointManager pinpointManager;
     private Button record_button;
@@ -54,7 +53,6 @@ public class Demo extends Activity {
     private TextView log;
     private ScrollView logView;
     static String strLog = null;
-    PowerManager.WakeLock wakeLock;
     private int preVolume = -1;
     Intent serviceIntent;
     Boolean record_started = false;
@@ -76,11 +74,6 @@ public class Demo extends Activity {
         setUI();
 
         AppResCopy.copyResFromAssetsToSD(this);
-
-        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
-                "MyWakelockTag");
-        wakeLock.acquire();
 
         //AWS analytics service
         PinpointConfiguration pinpointConfig = new PinpointConfiguration(
@@ -309,6 +302,5 @@ public class Demo extends Activity {
     @Override
      public void onDestroy() {
         super.onDestroy();
-        wakeLock.release();
      }
 }

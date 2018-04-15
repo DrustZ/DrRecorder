@@ -11,6 +11,7 @@ import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.PowerManager;
 import android.util.Log;
 
 import java.io.DataInputStream;
@@ -46,11 +47,12 @@ public class AudioService extends Service {
     String currentPath = "";
     private LinkedList<String> mFileQueue = new LinkedList<String>();
 
-    private int mInterval = 90000; // 5 seconds by default, can be changed later
+    private int mInterval = 30000; // 5 seconds by default, can be changed later
     private Handler mHandler;
     private int preVolume = -1;
     private static long activeTimes = 0;
 
+    PowerManager.WakeLock wakeLock;
     private Runnable runnable;
     private RecordingThread recordingThread;
     private final IBinder mBinder = new LocalBinder();
@@ -88,6 +90,12 @@ public class AudioService extends Service {
                 }
             }
         };
+
+        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                "MyWakelockTag");
+        wakeLock.acquire();
+
         return Service.START_STICKY;
     }
 
@@ -228,6 +236,7 @@ public class AudioService extends Service {
         stopRecording();
         restoreVolume();
         mHandler.removeCallbacks(mStatusChecker);
+        wakeLock.release();
     }
 
     private String getOutputFile() {
