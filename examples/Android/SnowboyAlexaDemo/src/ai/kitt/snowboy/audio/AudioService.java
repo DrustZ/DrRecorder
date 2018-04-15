@@ -19,14 +19,18 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 
 import ai.kitt.snowboy.Constants;
+import ai.kitt.snowboy.Demo;
 import ai.kitt.snowboy.MsgEnum;
 import ai.kitt.snowboy.demo.R;
 
@@ -42,14 +46,15 @@ public class AudioService extends Service {
     String currentPath = "";
     private LinkedList<String> mFileQueue = new LinkedList<String>();
 
-    private int mInterval = 5000; // 5 seconds by default, can be changed later
+    private int mInterval = 90000; // 5 seconds by default, can be changed later
     private Handler mHandler;
     private int preVolume = -1;
     private static long activeTimes = 0;
 
+    private Runnable runnable;
     private RecordingThread recordingThread;
     private final IBinder mBinder = new LocalBinder();
-    Activity activity;
+    Demo activity;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -57,6 +62,32 @@ public class AudioService extends Service {
         setProperVolume();
         activeTimes = 0;
         mHandler = new Handler();
+        runnable = new Runnable() {
+            @Override
+            public void run() {
+                //TODO your background code
+                int fsize = mFileQueue.size();
+                List<String> uploadFiles = new ArrayList<String>();
+                //Add the audio before keyword detected
+                if (fsize > 2) {
+                    uploadFiles.add(mFileQueue.get(fsize - 3));
+                }
+                //Add the audio when keyword detected
+                if (fsize > 1) {
+                    uploadFiles.add(mFileQueue.get(fsize - 2));
+                }
+                //Add the audio after keyword detected
+                uploadFiles.add(mFileQueue.getLast());
+                for (String fn : uploadFiles) {
+                    String wavfn = fn.replace("pcm", "wav");
+                    try {
+                        rawToWave(fn, wavfn);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        };
         return Service.START_STICKY;
     }
 
@@ -73,24 +104,14 @@ public class AudioService extends Service {
                         Log.d("[Log]", "Upload: 3 file");
                         conversationStarted = false;
                         keywordDetected = false;
+
+                        AsyncTask.execute(runnable);
                     }
 
                     // keyword recognized
                     if (keywordDetected) {
                         conversationStarted = true;
                         keywordDetected = false;
-                        AsyncTask.execute(new Runnable() {
-                                @Override
-                                public void run() {
-                                    //TODO your background code
-                                    String fn = currentPath.replace("pcm", "wav");
-                                    try {
-                                        rawToWave(currentPath, fn);
-                                    } catch (Exception e) {
-                                        e.printStackTrace();
-                                    }
-                                }
-                        });
 
                         Log.d("[Log]", "file detected!!!");
                     }
@@ -118,6 +139,7 @@ public class AudioService extends Service {
                 case MSG_ACTIVE:
                     activeTimes++;
                     keywordDetected = true;
+                    activity.updateLog("Detected " + activeTimes + " times");
                     Log.d("[Log]"," ----> Detected " + activeTimes + " times");
                     // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
                     break;
@@ -157,7 +179,7 @@ public class AudioService extends Service {
     }
 
     //Here Activity register to the service as Callbacks client
-    public void registerClient(Activity activity){
+    public void registerClient(Demo activity){
         this.activity = activity;
     }
 

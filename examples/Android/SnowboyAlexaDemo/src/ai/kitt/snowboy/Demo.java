@@ -218,13 +218,6 @@ public class Demo extends Activity {
         Demo.this.startActivity(myIntent);
     }
 
-//
-//    private void stopPlayback() {
-//        updateLog(" ----> playback stopped ", "green");
-//        play_button.setText(R.string.btn2_start);
-//
-//    }
-
     private void sleep() {
         try { Thread.sleep(500);
         } catch (Exception e) {}
