@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.io.DataInputStream;
@@ -35,19 +36,26 @@ import ai.kitt.snowboy.Demo;
 import ai.kitt.snowboy.MsgEnum;
 import ai.kitt.snowboy.demo.R;
 
+import com.amazonaws.AmazonClientException;
+import com.amazonaws.AmazonServiceException;
 import com.amazonaws.mobile.client.AWSMobileClient;
 import com.amazonaws.mobileconnectors.s3.transferutility.*;
+import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 
 public class AudioService extends Service {
     static String strLog = null;
     Boolean isRecording = Boolean.FALSE;
     Boolean keywordDetected = Boolean.FALSE;
-    Boolean conversationStarted = false;
-    String currentPath = "";
-    private LinkedList<String> mFileQueue = new LinkedList<String>();
+    int conversationStarted = 0; // count for after-trigger minutes
+    int recordBtn_pressed_count = 0; // when user press record actively, maximum 5 minutes
 
-    private int mInterval = 30000; // 5 seconds by default, can be changed later
+    String currentPath = "";
+    String uploadpath = "";
+    private LinkedList<String> mFileQueue = new LinkedList<String>();
+    private LinkedList<Boolean> mFileStatusQueue = new LinkedList<Boolean>();
+
+    private int mInterval = 60000; // 5 seconds by default, can be changed later
     private Handler mHandler;
     private int preVolume = -1;
     private static long activeTimes = 0;
@@ -64,29 +72,45 @@ public class AudioService extends Service {
         setProperVolume();
         activeTimes = 0;
         mHandler = new Handler();
+        // passive audio upload
+//        runnable_passive = new Runnable() {
+//            @Override
+//            public void run() {
+//                //TODO your background code
+//                int fsize = mFileQueue.size();
+//                List<String> uploadFiles = new ArrayList<String>();
+//                //Add the audio before keyword detected
+//                if (fsize > 2) {
+//                    uploadFiles.add(mFileQueue.get(fsize - 3));
+//                }
+//                //Add the audio when keyword detected
+//                if (fsize > 1) {
+//                    uploadFiles.add(mFileQueue.get(fsize - 2));
+//                }
+//                //Add the audio after keyword detected
+//                uploadFiles.add(mFileQueue.getLast());
+//                for (String fn : uploadFiles) {
+//                    String wavfn = fn.replace("pcm", "wav");
+//                    try {
+//                        rawToWave(fn, wavfn);
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            }
+//        };
+
+        //active audio upload
         runnable = new Runnable() {
             @Override
             public void run() {
                 //TODO your background code
-                int fsize = mFileQueue.size();
-                List<String> uploadFiles = new ArrayList<String>();
-                //Add the audio before keyword detected
-                if (fsize > 2) {
-                    uploadFiles.add(mFileQueue.get(fsize - 3));
-                }
-                //Add the audio when keyword detected
-                if (fsize > 1) {
-                    uploadFiles.add(mFileQueue.get(fsize - 2));
-                }
                 //Add the audio after keyword detected
-                uploadFiles.add(mFileQueue.getLast());
-                for (String fn : uploadFiles) {
-                    String wavfn = fn.replace("pcm", "wav");
-                    try {
-                        rawToWave(fn, wavfn);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+                 String wavfn = uploadpath.replace("pcm", "wav");
+                 try {
+                     rawToWave(uploadpath, wavfn);
+                 }catch (Exception e) {
+                     e.printStackTrace();
                 }
             }
         };
@@ -107,29 +131,62 @@ public class AudioService extends Service {
                     stopRecording(); //this function can change value of mInterval.
                     mFileQueue.add(currentPath);
                     Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
-                    if (conversationStarted) {
-                        //upload the prior three conversation
-                        Log.d("[Log]", "Upload: 3 file");
-                        conversationStarted = false;
-                        keywordDetected = false;
 
-                        AsyncTask.execute(runnable);
+                    //if active recording mode
+                    if (recordBtn_pressed_count > 0) {
+                        mFileStatusQueue.add(true);
+                        Log.d("[Log]", "Active recording");
+                        conversationStarted = 0;
+                        keywordDetected = false;
+                        recordBtn_pressed_count -= 1;
+
+                        // rename
+                        String fn = mFileQueue.getLast();
+                        File from = new File(fn);
+                        String fnto = Constants.DEFAULT_WORK_SPACE + "/" + "active_" + fn.substring(fn.lastIndexOf("/")+1);
+                        File to = new File(fnto);
+                        if(from.exists())
+                            from.renameTo(to);
+                        mFileQueue.removeLast();
+                        mFileQueue.add(fnto);
+
+                        if (recordBtn_pressed_count == 0){
+                            //stop recording actively (update UI)
+                            activity.StopActiveRecording();
+                        }
                     }
-
-                    // keyword recognized
-                    if (keywordDetected) {
-                        conversationStarted = true;
-                        keywordDetected = false;
-
-                        Log.d("[Log]", "file detected!!!");
+                    //else if passive recording mode
+                    else {
+                        if (conversationStarted > 0) {
+                            //upload the prior three conversation
+                            Log.d("[Log]", "conversation file :"+String.valueOf(conversationStarted));
+                            conversationStarted -= 1;
+                            keywordDetected = false;
+                            mFileStatusQueue.add(true);
+                        }
+                        // keyword recognized
+                        else if (keywordDetected) {
+                            conversationStarted = 2;
+                            keywordDetected = false;
+                            mFileStatusQueue.add(true);
+                            Log.d("[Log]", "file detected!!!");
+                        } else {
+                            mFileStatusQueue.add(false);
+                        }
                     }
 
                     if (mFileQueue.size() > 10) {
-                        String path = mFileQueue.remove();
-                        File file = new File(path);
-                        file.delete();
+                        uploadpath = mFileQueue.remove();
+                        boolean upload = mFileStatusQueue.remove();
+                        if (upload){
+                            AsyncTask.execute(runnable);
+                        } else {
+                            File file = new File(uploadpath);
+                            file.delete();
+                        }
                     }
                 }
+                SystemClock.sleep(50);
                 startRecording();
             } finally {
                 // 100% guarantee that this always happens, even if
@@ -145,10 +202,9 @@ public class AudioService extends Service {
             MsgEnum message = MsgEnum.getMsgEnum(msg.what);
             switch(message) {
                 case MSG_ACTIVE:
-                    activeTimes++;
+//                    activeTimes++;
                     keywordDetected = true;
-                    activity.updateLog("Detected " + activeTimes + " times");
-                    Log.d("[Log]"," ----> Detected " + activeTimes + " times");
+//                    Log.d("[Log]"," ----> Detected " + activeTimes + " times");
                     // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
                     break;
                 case MSG_INFO:
@@ -197,6 +253,7 @@ public class AudioService extends Service {
     }
 
     private void startRecording() {
+        Log.d("[Log]", "startRecording: called!");
         isRecording = true;
         currentPath = getOutputFile();
         recordingThread = new RecordingThread(handle, new AudioDataSaver(currentPath));
@@ -206,6 +263,19 @@ public class AudioService extends Service {
     private void stopRecording() {
         isRecording = false;
         recordingThread.stopRecording();
+    }
+
+    public void StartActiveRecording(){
+        recordBtn_pressed_count = 5;
+    }
+
+    public void StopActiveRecording(){
+        recordBtn_pressed_count =  1;
+    }
+
+    public void DeleteLastTenMin(){
+        mFileQueue.clear();
+        mFileStatusQueue.clear();
     }
 
     private void setProperVolume() {
@@ -294,6 +364,9 @@ public class AudioService extends Service {
                 output.close();
                 uploadWithTransferUtility(wavefn);
             }
+            File file = new File(rawfn);
+            file.delete();
+            Log.d("[Log]", "rawToWave: delete the raw file.");
         }
     }
     byte[] fullyReadFileToBytes(File f) throws IOException {

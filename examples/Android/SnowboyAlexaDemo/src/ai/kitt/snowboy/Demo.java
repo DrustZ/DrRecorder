@@ -1,35 +1,31 @@
 package ai.kitt.snowboy;
 
-import ai.kitt.snowboy.audio.RecordingThread;
-import ai.kitt.snowboy.audio.PlaybackThread;
 import ai.kitt.snowboy.audio.AudioService;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ComponentName;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.Message;
-import android.os.PowerManager;
-import android.text.Html;
+import android.support.v4.content.ContextCompat;
+import android.text.InputType;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ScrollView;
-import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Context;
 
-import com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUser;
 import com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUserDetails;
 import com.amazonaws.mobileconnectors.cognitoidentityprovider.handlers.GetDetailsHandler;
-import com.amazonaws.mobileconnectors.s3.transferutility.*;
 import com.amazonaws.mobile.auth.core.IdentityManager;
 import com.amazonaws.mobile.auth.core.SignInStateChangeListener;
 import com.amazonaws.mobile.client.AWSMobileClient;
@@ -49,14 +45,17 @@ public class Demo extends Activity {
     private Button record_button;
     private Button play_button;
     private Button prefix_button;
+    private Button active_recording_button;
+    private Button delete_button;
+
     private EditText editText;
-    private TextView log;
-    private ScrollView logView;
     static String strLog = null;
     private int preVolume = -1;
     Intent serviceIntent;
     Boolean record_started = false;
+    Boolean is_active_recording = false;
     AudioService audioservice ;
+    AlertDialog.Builder builder = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -94,23 +93,6 @@ public class Demo extends Activity {
             @Override
             public void onUserSignedIn() {
                 Log.d("[Log]", "User Signed In");
-
-                GetDetailsHandler getDetailsHandler = new GetDetailsHandler() {
-                    @Override
-                    public void onSuccess(CognitoUserDetails cognitoUserDetails) {
-                        // The user detail are in cognitoUserDetails
-
-                        // Fetch the user details
-                        Map userAtts=new HashMap();
-                        userAtts =cognitoUserDetails.getAttributes().getAttributes();
-                        String userName = userAtts.get("alias:preferred_username").toString();
-                    }
-
-                    @Override
-                    public void onFailure(Exception exception) {
-                        // Fetch user details failed, check exception for the cause
-                    }
-                };
             }
 
             @Override
@@ -125,7 +107,7 @@ public class Demo extends Activity {
         @Override
         public void onServiceConnected(ComponentName className,
                                        IBinder service) {
-            Toast.makeText(Demo.this, "onServiceConnected called", Toast.LENGTH_SHORT).show();
+//            Toast.makeText(Demo.this, "onServiceConnected called", Toast.LENGTH_SHORT).show();
             // We've binded to LocalService, cast the IBinder and get LocalService instance
             AudioService.LocalBinder binder = (AudioService.LocalBinder) service;
             audioservice = binder.getServiceInstance(); //Get instance of your service!
@@ -135,7 +117,7 @@ public class Demo extends Activity {
 
         @Override
         public void onServiceDisconnected(ComponentName arg0) {
-            Toast.makeText(Demo.this, "onServiceDisconnected called", Toast.LENGTH_SHORT).show();
+//            Toast.makeText(Demo.this, "onServiceDisconnected called", Toast.LENGTH_SHORT).show();
         }
     };
 
@@ -151,9 +133,6 @@ public class Demo extends Activity {
         play_button = (Button) findViewById(R.id.btn_test2);
         play_button.setOnClickListener(play_button_handle);
         play_button.setEnabled(true);
-
-        log = (TextView)findViewById(R.id.log);
-        logView = (ScrollView)findViewById(R.id.logView);
 
         editText = (EditText) findViewById(R.id.prefixEdit);
         prefix_button = (Button) findViewById(R.id.prefixBtn);
@@ -171,6 +150,59 @@ public class Demo extends Activity {
             }
         });
 
+        active_recording_button = (Button) findViewById(R.id.ActiveRecordBtn);
+        active_recording_button.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                if (is_active_recording){
+                    is_active_recording = false;
+                    active_recording_button.setTextColor(Color.parseColor("#EA2929"));
+                    active_recording_button.setBackgroundResource(R.drawable.btnborder);
+                    active_recording_button.setText("Start Recording");
+                    audioservice.StopActiveRecording();
+                } else {
+                    if (audioservice != null) {
+                        is_active_recording = true;
+                        active_recording_button.setTextColor(Color.WHITE);
+                        active_recording_button.setBackgroundColor(Color.parseColor("#EA2929"));
+                        active_recording_button.setText("Stop Recording");
+                        audioservice.StartActiveRecording();
+                    }
+                }
+            }
+        });
+        delete_button = (Button) findViewById(R.id.btnDelete);
+        delete_button.setOnClickListener(delete_button_handle);
+
+        builder = new AlertDialog.Builder(this);
+        builder.setTitle("Please enter pin:");
+
+        // Set up the input
+        final EditText input = new EditText(this);
+        // Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        builder.setView(input);
+
+        // Set up the buttons
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String text = input.getText().toString();
+                if (text == "1900"){
+                    Toast.makeText(Demo.this, "Deleted Successfully.", Toast.LENGTH_SHORT).show();
+                    if (audioservice != null) {
+//                    audioservice.DeleteLastTenMin();
+                    }
+                }
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
         SharedPreferences prefs = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE);
         String prefix = prefs.getString("prefix", null);
         if (prefix != null)
@@ -180,19 +212,14 @@ public class Demo extends Activity {
     private void setMaxVolume() {
         AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         preVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        updateLog(" ----> preVolume = "+preVolume, "green");
         int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        updateLog(" ----> maxVolume = "+maxVolume, "green");
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0);
-        int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        updateLog(" ----> currentVolume = "+currentVolume, "green");
     }
 
     private void startRecording() {
         record_started = true;
         startService(serviceIntent);
         bindService(serviceIntent, mConnection, Context.BIND_AUTO_CREATE); //Binding to the service!
-        updateLog(" ----> recording started ...", "green");
         record_button.setText(R.string.btn1_stop);
     }
 
@@ -200,12 +227,17 @@ public class Demo extends Activity {
         record_started = false;
         unbindService(mConnection);
         stopService(serviceIntent);
-        updateLog(" ----> recording stopped ", "green");
         record_button.setText(R.string.btn1_start);
     }
 
-    private void startPlayback() {
-        updateLog(" ----> user sign out ...", "green");
+    public void StopActiveRecording() {
+        is_active_recording = false;
+        active_recording_button.setTextColor(Color.parseColor("#EA2929"));
+        active_recording_button.setBackgroundResource(R.drawable.btnborder);
+        active_recording_button.setText("Start Recording");
+    }
+
+    private void signOut() {
         IdentityManager.getDefaultIdentityManager().signOut();
         Intent myIntent = new Intent(Demo.this, AuthenticatorActivity.class);
         Demo.this.startActivity(myIntent);
@@ -239,65 +271,17 @@ public class Demo extends Activity {
                     stopRecording();
                     sleep();
                 }
-                startPlayback();
+                signOut();
             }
         }
     };
 
-     public void updateLog(final String text) {
-
-         log.post(new Runnable() {
-             @Override
-             public void run() {
-                 if (currLogLineNum >= MAX_LOG_LINE_NUM) {
-                     int st = strLog.indexOf("<br>");
-                     strLog = strLog.substring(st+4);
-                 } else {
-                     currLogLineNum++;
-                 }
-                 String str = "<font color='white'>"+text+"</font>"+"<br>";
-                 strLog = (strLog == null || strLog.length() == 0) ? str : strLog + str;
-                 log.setText(Html.fromHtml(strLog));
-             }
-        });
-        logView.post(new Runnable() {
-            @Override
-            public void run() {
-                logView.fullScroll(ScrollView.FOCUS_DOWN);
-            }
-        });
-    }
-
-    static int MAX_LOG_LINE_NUM = 200;
-    static int currLogLineNum = 0;
-
-    public void updateLog(final String text, final String color) {
-        log.post(new Runnable() {
-            @Override
-            public void run() {
-                if(currLogLineNum>=MAX_LOG_LINE_NUM) {
-                    int st = strLog.indexOf("<br>");
-                    strLog = strLog.substring(st+4);
-                } else {
-                    currLogLineNum++;
-                }
-                String str = "<font color='"+color+"'>"+text+"</font>"+"<br>";
-                strLog = (strLog == null || strLog.length() == 0) ? str : strLog + str;
-                log.setText(Html.fromHtml(strLog));
-            }
-        });
-        logView.post(new Runnable() {
-            @Override
-            public void run() {
-                logView.fullScroll(ScrollView.FOCUS_DOWN);
-            }
-        });
-    }
-
-    private void emptyLog() {
-        strLog = null;
-        log.setText("");
-    }
+    private OnClickListener delete_button_handle = new OnClickListener() {
+        // @Override
+        public void onClick(View arg0) {
+            builder.show();
+        }
+    };
 
     @Override
      public void onDestroy() {
