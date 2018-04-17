@@ -17,11 +17,14 @@ import android.os.IBinder;
 import android.support.v4.content.ContextCompat;
 import android.text.InputType;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 import android.content.Context;
 
@@ -48,6 +51,9 @@ public class Demo extends Activity {
     private Button prefix_button;
     private Button active_recording_button;
     private Button delete_button;
+    private Button admin_button;
+    private LinearLayout l_layout;
+    private RelativeLayout r_layout;
 
     private EditText editText;
     static String strLog = null;
@@ -55,6 +61,7 @@ public class Demo extends Activity {
     Intent serviceIntent;
     Boolean record_started = false;
     Boolean is_active_recording = false;
+    long lastDown = 0;
     AudioService audioservice ;
     AlertDialog.Builder builder = null;
 
@@ -129,6 +136,7 @@ public class Demo extends Activity {
     }
     
     private void setUI() {
+
         record_button = (Button) findViewById(R.id.btn_test1);
         record_button.setOnClickListener(record_button_handle);
         record_button.setEnabled(true);
@@ -137,18 +145,55 @@ public class Demo extends Activity {
         play_button.setOnClickListener(play_button_handle);
         play_button.setEnabled(true);
 
+        admin_button = (Button) findViewById(R.id.adminTriggerBtn);
+        admin_button.setOnTouchListener(admin_button_handle);
+
+        l_layout = (LinearLayout) findViewById(R.id.linearlayout);
+        r_layout = (RelativeLayout) findViewById(R.id.titleLinearLayout);
+        l_layout.setVisibility(View.INVISIBLE);
+        r_layout.setVisibility(View.INVISIBLE);
+
         editText = (EditText) findViewById(R.id.prefixEdit);
         prefix_button = (Button) findViewById(R.id.prefixBtn);
         prefix_button.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
-                String prefix = editText.getText().toString();
-                prefix = prefix.trim();
-                if (!prefix.isEmpty()){
-                    SharedPreferences.Editor editor = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE).edit();
-                    editor.putString("prefix", prefix);
-                    editor.apply();
-                }
+                builder = new AlertDialog.Builder(Demo.this);
+                builder.setTitle("Please enter pin:");
+
+                // Set up the input
+                final EditText input = new EditText(Demo.this);
+                // Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
+                input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                builder.setView(input);
+
+                // Set up the buttons
+                builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        String text = input.getText().toString();
+                        InputMethodManager mgr = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                        mgr.hideSoftInputFromWindow(input.getWindowToken(), 0);
+                        if (text.equals("2050")){
+                            Toast.makeText(Demo.this, "Prefix Changed Successfully.", Toast.LENGTH_SHORT).show();
+                            String prefix = editText.getText().toString();
+                            prefix = prefix.trim();
+                            if (!prefix.isEmpty()){
+                                SharedPreferences.Editor editor = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE).edit();
+                                editor.putString("prefix", prefix);
+                                editor.apply();
+                            }
+                        }
+                    }
+                });
+                builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.cancel();
+                    }
+                });
+                builder.show();
+
                 editText.clearFocus();
             }
         });
@@ -285,6 +330,26 @@ public class Demo extends Activity {
                 }
             });
             builder.show();
+        }
+    };
+
+    private View.OnTouchListener admin_button_handle = new View.OnTouchListener() {
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                lastDown = System.currentTimeMillis();
+            } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                if (System.currentTimeMillis() - lastDown > 4000) {
+                    if (l_layout.getVisibility() == View.VISIBLE){
+                        l_layout.setVisibility(View.INVISIBLE);
+                        r_layout.setVisibility(View.INVISIBLE);
+                    } else {
+                        l_layout.setVisibility(View.VISIBLE);
+                        r_layout.setVisibility(View.VISIBLE);
+                    }
+                }
+            }
+            return true;
         }
     };
 
