@@ -19,6 +19,7 @@ import android.text.InputType;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -73,6 +74,8 @@ public class Demo extends Activity {
         setUI();
 
         AppResCopy.copyResFromAssetsToSD(this);
+
+        Thread.setDefaultUncaughtExceptionHandler(new MyExceptionHandler(this));
 
         //AWS analytics service
         PinpointConfiguration pinpointConfig = new PinpointConfiguration(
@@ -174,35 +177,6 @@ public class Demo extends Activity {
         delete_button = (Button) findViewById(R.id.btnDelete);
         delete_button.setOnClickListener(delete_button_handle);
 
-        builder = new AlertDialog.Builder(this);
-        builder.setTitle("Please enter pin:");
-
-        // Set up the input
-        final EditText input = new EditText(this);
-        // Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        builder.setView(input);
-
-        // Set up the buttons
-        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                String text = input.getText().toString();
-                if (text == "1900"){
-                    Toast.makeText(Demo.this, "Deleted Successfully.", Toast.LENGTH_SHORT).show();
-                    if (audioservice != null) {
-//                    audioservice.DeleteLastTenMin();
-                    }
-                }
-            }
-        });
-        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();
-            }
-        });
-
         SharedPreferences prefs = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE);
         String prefix = prefs.getString("prefix", null);
         if (prefix != null)
@@ -238,9 +212,10 @@ public class Demo extends Activity {
     }
 
     private void signOut() {
-        IdentityManager.getDefaultIdentityManager().signOut();
-        Intent myIntent = new Intent(Demo.this, AuthenticatorActivity.class);
-        Demo.this.startActivity(myIntent);
+        throw new NullPointerException();
+//        IdentityManager.getDefaultIdentityManager().signOut();
+//        Intent myIntent = new Intent(Demo.this, AuthenticatorActivity.class);
+//        Demo.this.startActivity(myIntent);
     }
 
     private void sleep() {
@@ -279,6 +254,36 @@ public class Demo extends Activity {
     private OnClickListener delete_button_handle = new OnClickListener() {
         // @Override
         public void onClick(View arg0) {
+            builder = new AlertDialog.Builder(Demo.this);
+            builder.setTitle("Please enter pin:");
+
+            // Set up the input
+            final EditText input = new EditText(Demo.this);
+            // Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
+            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            builder.setView(input);
+
+            // Set up the buttons
+            builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    String text = input.getText().toString();
+                    InputMethodManager mgr = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    mgr.hideSoftInputFromWindow(input.getWindowToken(), 0);
+                    if (text.equals("1900")){
+                        Toast.makeText(Demo.this, "Deleted Successfully.", Toast.LENGTH_SHORT).show();
+                        if (audioservice != null) {
+                            audioservice.DeleteLastTenMin();
+                        }
+                    }
+                }
+            });
+            builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    dialog.cancel();
+                }
+            });
             builder.show();
         }
     };

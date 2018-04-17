@@ -72,35 +72,7 @@ public class AudioService extends Service {
         setProperVolume();
         activeTimes = 0;
         mHandler = new Handler();
-        // passive audio upload
-//        runnable_passive = new Runnable() {
-//            @Override
-//            public void run() {
-//                //TODO your background code
-//                int fsize = mFileQueue.size();
-//                List<String> uploadFiles = new ArrayList<String>();
-//                //Add the audio before keyword detected
-//                if (fsize > 2) {
-//                    uploadFiles.add(mFileQueue.get(fsize - 3));
-//                }
-//                //Add the audio when keyword detected
-//                if (fsize > 1) {
-//                    uploadFiles.add(mFileQueue.get(fsize - 2));
-//                }
-//                //Add the audio after keyword detected
-//                uploadFiles.add(mFileQueue.getLast());
-//                for (String fn : uploadFiles) {
-//                    String wavfn = fn.replace("pcm", "wav");
-//                    try {
-//                        rawToWave(fn, wavfn);
-//                    } catch (Exception e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            }
-//        };
 
-        //active audio upload
         runnable = new Runnable() {
             @Override
             public void run() {
@@ -132,6 +104,8 @@ public class AudioService extends Service {
                     mFileQueue.add(currentPath);
                     Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
 
+                    String a = null;
+                    a.length();
                     //if active recording mode
                     if (recordBtn_pressed_count > 0) {
                         mFileStatusQueue.add(true);
