@@ -104,8 +104,6 @@ public class AudioService extends Service {
                     mFileQueue.add(currentPath);
                     Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
 
-                    String a = null;
-                    a.length();
                     //if active recording mode
                     if (recordBtn_pressed_count > 0) {
                         mFileStatusQueue.add(true);
@@ -248,6 +246,10 @@ public class AudioService extends Service {
     }
 
     public void DeleteLastTenMin(){
+        for (String fn : mFileQueue){
+            File file = new File(fn);
+            file.delete();
+        }
         mFileQueue.clear();
         mFileStatusQueue.clear();
     }

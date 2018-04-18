@@ -12,6 +12,7 @@ import android.media.MediaRecorder;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Message;
+import android.os.SystemClock;
 import android.util.Log;
 
 import ai.kitt.snowboy.SnowboyDetect;
@@ -25,11 +26,12 @@ public class RecordingThread {
     private static final String ACTIVE_UMDL_ALEXA = Constants.ACTIVE_UMDL_ALEXA;
     private static final String ACTIVE_UMDL_GOOGLE = Constants.ACTIVE_UMDL_GOOGLE;
     
-    private boolean shouldContinue;
+    private volatile boolean shouldContinue, isRecording;
     private AudioDataReceivedListener listener = null;
     private Handler handler = null;
     private Thread thread;
-    
+    private AudioRecord record = null;
+
     private static String strEnvWorkSpace = Constants.DEFAULT_WORK_SPACE;
     private String activeModel_alexa = strEnvWorkSpace+ACTIVE_UMDL_ALEXA;
     private String activeModel_google = strEnvWorkSpace+ACTIVE_UMDL_GOOGLE;
@@ -65,6 +67,9 @@ public class RecordingThread {
             return;
 
         shouldContinue = true;
+        while(isRecording){
+            SystemClock.sleep(5);
+        }
         thread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -79,6 +84,20 @@ public class RecordingThread {
             return;
 
         shouldContinue = false;
+
+        while (isRecording){
+            SystemClock.sleep(10);
+            Log.v(TAG, "stopRecording: waiting");
+        }
+
+        thread.interrupt();
+        record.stop();
+        record.release();
+        record = null;
+        if (null != listener) {
+            listener.stop();
+        }
+
         thread = null;
     }
 
@@ -91,9 +110,10 @@ public class RecordingThread {
         if (bufferSize == AudioRecord.ERROR || bufferSize == AudioRecord.ERROR_BAD_VALUE) {
             bufferSize = Constants.SAMPLE_RATE * 2;
         }
+        isRecording = true;
 
         byte[] audioBuffer = new byte[bufferSize];
-        AudioRecord record = new AudioRecord(
+        record = new AudioRecord(
             MediaRecorder.AudioSource.DEFAULT,
             Constants.SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
@@ -104,7 +124,9 @@ public class RecordingThread {
             Log.e(TAG, "Audio Record can't initialize!");
             return;
         }
+
         record.startRecording();
+
         if (null != listener) {
             listener.start();
         }
@@ -142,13 +164,7 @@ public class RecordingThread {
                 player.start();
             }
         }
-
-        record.stop();
-        record.release();
-
-        if (null != listener) {
-            listener.stop();
-        }
+        isRecording = false;
         Log.v(TAG, String.format("Recording stopped. Samples read: %d", shortsRead));
     }
 }

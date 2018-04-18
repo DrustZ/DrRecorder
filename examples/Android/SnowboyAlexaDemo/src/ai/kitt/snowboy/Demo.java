@@ -12,9 +12,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.media.AudioManager;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
-import android.support.v4.content.ContextCompat;
 import android.text.InputType;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -28,8 +26,6 @@ import android.widget.RelativeLayout;
 import android.widget.Toast;
 import android.content.Context;
 
-import com.amazonaws.mobileconnectors.cognitoidentityprovider.CognitoUserDetails;
-import com.amazonaws.mobileconnectors.cognitoidentityprovider.handlers.GetDetailsHandler;
 import com.amazonaws.mobile.auth.core.IdentityManager;
 import com.amazonaws.mobile.auth.core.SignInStateChangeListener;
 import com.amazonaws.mobile.client.AWSMobileClient;
@@ -38,10 +34,12 @@ import com.amazonaws.mobile.client.AWSStartupResult;
 import com.amazonaws.mobileconnectors.pinpoint.PinpointConfiguration;
 import com.amazonaws.mobileconnectors.pinpoint.PinpointManager;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
-import ai.kitt.snowboy.audio.AudioDataSaver;
 import ai.kitt.snowboy.demo.R;
 
 public class Demo extends Activity {
@@ -103,6 +101,7 @@ public class Demo extends Activity {
             @Override
             public void onUserSignedIn() {
                 Log.d("[Log]", "User Signed In");
+                startRecording();
             }
 
             @Override
@@ -257,10 +256,9 @@ public class Demo extends Activity {
     }
 
     private void signOut() {
-        throw new NullPointerException();
-//        IdentityManager.getDefaultIdentityManager().signOut();
-//        Intent myIntent = new Intent(Demo.this, AuthenticatorActivity.class);
-//        Demo.this.startActivity(myIntent);
+        IdentityManager.getDefaultIdentityManager().signOut();
+        Intent myIntent = new Intent(Demo.this, AuthenticatorActivity.class);
+        Demo.this.startActivity(myIntent);
     }
 
     private void sleep() {
@@ -319,6 +317,17 @@ public class Demo extends Activity {
                         Toast.makeText(Demo.this, "Deleted Successfully.", Toast.LENGTH_SHORT).show();
                         if (audioservice != null) {
                             audioservice.DeleteLastTenMin();
+
+                            try {
+                                SimpleDateFormat dateFormat = new SimpleDateFormat
+                                        ("MMdd_HH_mm_ss", Locale.US);
+                                String filename = Constants.DEFAULT_WORK_SPACE + "/DeleteLog.txt";
+                                FileWriter fw = new FileWriter(filename, true);
+                                fw.write( dateFormat.format(new Date()) + "\n");
+                                fw.close();
+                            } catch (IOException ioe) {
+                                ioe.printStackTrace();
+                            }
                         }
                     }
                 }
@@ -339,7 +348,8 @@ public class Demo extends Activity {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
                 lastDown = System.currentTimeMillis();
             } else if (event.getAction() == MotionEvent.ACTION_UP) {
-                if (System.currentTimeMillis() - lastDown > 4000) {
+                Log.d("[Log]", "onTouch: "+String.valueOf(System.currentTimeMillis() - lastDown));
+                if (System.currentTimeMillis() - lastDown > 3000) {
                     if (l_layout.getVisibility() == View.VISIBLE){
                         l_layout.setVisibility(View.INVISIBLE);
                         r_layout.setVisibility(View.INVISIBLE);

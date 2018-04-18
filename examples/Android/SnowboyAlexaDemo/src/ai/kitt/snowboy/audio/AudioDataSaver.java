@@ -33,7 +33,6 @@ public class AudioDataSaver implements AudioDataReceivedListener {
 
     public AudioDataSaver(String fnpath) {
         saveFile = new File(fnpath);
-        Log.e(TAG, Constants.SAVE_AUDIO);
     }
 
     @Override
