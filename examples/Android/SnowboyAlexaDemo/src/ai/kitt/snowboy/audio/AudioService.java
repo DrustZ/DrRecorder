@@ -20,6 +20,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
@@ -158,7 +159,7 @@ public class AudioService extends Service {
                         }
                     }
                 }
-                SystemClock.sleep(50);
+//                SystemClock.sleep(50);
                 startRecording();
             } finally {
                 // 100% guarantee that this always happens, even if
@@ -248,10 +249,41 @@ public class AudioService extends Service {
     public void DeleteLastTenMin(){
         for (String fn : mFileQueue){
             File file = new File(fn);
-            file.delete();
+            if (file.exists()) {
+                file.delete();
+            }
         }
         mFileQueue.clear();
         mFileStatusQueue.clear();
+        try {
+            SimpleDateFormat dateFormat = new SimpleDateFormat
+                    ("MMdd_HH_mm_ss", Locale.US);
+            String filename = Constants.DEFAULT_WORK_SPACE + "/DeleteLog.txt";
+            FileWriter fw = new FileWriter(filename, true);
+            fw.write( dateFormat.format(new Date()) + "\n");
+            fw.close();
+
+            TransferUtility transferUtility =
+                    TransferUtility.builder()
+                            .context(getApplicationContext())
+                            .awsConfiguration(AWSMobileClient.getInstance().getConfiguration())
+                            .s3Client(new AmazonS3Client(AWSMobileClient.getInstance().getCredentialsProvider()))
+                            .build();
+
+            SharedPreferences prefs = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE);
+            String prefix = prefs.getString("prefix", null);
+            if (prefix == null)
+                prefix = "test";
+
+            String uploadname = prefix + "/DeleteLog.txt";
+            TransferObserver uploadObserver =
+                    transferUtility.upload(
+                            uploadname,
+                            new File(filename));
+
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
     }
 
     private void setProperVolume() {
@@ -400,9 +432,9 @@ public class AudioService extends Service {
         SharedPreferences prefs = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE);
         String prefix = prefs.getString("prefix", null);
         if (prefix == null)
-            prefix = "";
+            prefix = "test";
 
-        String uploadname = "s3Folder/" + prefix + "_" + fn.substring(fn.lastIndexOf("/")+1);
+        String uploadname = prefix + "/" + prefix + "_" + fn.substring(fn.lastIndexOf("/")+1);
         TransferObserver uploadObserver =
                 transferUtility.upload(
                         uploadname,

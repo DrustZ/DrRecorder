@@ -26,8 +26,6 @@ import android.widget.RelativeLayout;
 import android.widget.Toast;
 import android.content.Context;
 
-import com.amazonaws.mobile.auth.core.IdentityManager;
-import com.amazonaws.mobile.auth.core.SignInStateChangeListener;
 import com.amazonaws.mobile.client.AWSMobileClient;
 import com.amazonaws.mobile.client.AWSStartupHandler;
 import com.amazonaws.mobile.client.AWSStartupResult;
@@ -66,17 +64,18 @@ public class Demo extends Activity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //configure and get AWS connected
-        AWSMobileClient.getInstance().initialize(this, new AWSStartupHandler() {
-            @Override
-            public void onComplete(AWSStartupResult awsStartupResult) {
-                Log.d("YourMainActivity", "AWSMobileClient is instantiated and you are connected to AWS!");
-            }
-        }).execute();
 
         serviceIntent = new Intent(Demo.this, AudioService.class);
         setContentView(R.layout.main);
         setUI();
+
+        AWSMobileClient.getInstance().initialize(this, new AWSStartupHandler() {
+            @Override
+            public void onComplete(AWSStartupResult awsStartupResult) {
+                Log.d("YourMainActivity", "AWSMobileClient is instantiated and you are connected to AWS!");
+                startRecording();
+            }
+        }).execute();
 
         AppResCopy.copyResFromAssetsToSD(this);
 
@@ -97,18 +96,6 @@ public class Demo extends Activity {
         pinpointManager.getSessionClient().stopSession();
         pinpointManager.getAnalyticsClient().submitEvents();
 
-        IdentityManager.getDefaultIdentityManager().addSignInStateChangeListener(new SignInStateChangeListener() {
-            @Override
-            public void onUserSignedIn() {
-                Log.d("[Log]", "User Signed In");
-                startRecording();
-            }
-
-            @Override
-            public void onUserSignedOut() {
-                Log.d("[Log]", "User Signed Out");
-            }
-        });
     }
 
     private ServiceConnection mConnection = new ServiceConnection() {
@@ -256,9 +243,6 @@ public class Demo extends Activity {
     }
 
     private void signOut() {
-        IdentityManager.getDefaultIdentityManager().signOut();
-        Intent myIntent = new Intent(Demo.this, AuthenticatorActivity.class);
-        Demo.this.startActivity(myIntent);
     }
 
     private void sleep() {
@@ -317,17 +301,6 @@ public class Demo extends Activity {
                         Toast.makeText(Demo.this, "Deleted Successfully.", Toast.LENGTH_SHORT).show();
                         if (audioservice != null) {
                             audioservice.DeleteLastTenMin();
-
-                            try {
-                                SimpleDateFormat dateFormat = new SimpleDateFormat
-                                        ("MMdd_HH_mm_ss", Locale.US);
-                                String filename = Constants.DEFAULT_WORK_SPACE + "/DeleteLog.txt";
-                                FileWriter fw = new FileWriter(filename, true);
-                                fw.write( dateFormat.format(new Date()) + "\n");
-                                fw.close();
-                            } catch (IOException ioe) {
-                                ioe.printStackTrace();
-                            }
                         }
                     }
                 }

@@ -37,14 +37,14 @@ public class RecordingThread {
     private String activeModel_google = strEnvWorkSpace+ACTIVE_UMDL_GOOGLE;
     private String commonRes = strEnvWorkSpace+ACTIVE_RES;   
     
-    private SnowboyDetect detector = new SnowboyDetect(commonRes, activeModel_alexa+","+activeModel_google);
+    private SnowboyDetect detector = new SnowboyDetect(commonRes, activeModel_google);
     private MediaPlayer player = new MediaPlayer();
 
     public RecordingThread(Handler handler, AudioDataReceivedListener listener) {
         this.handler = handler;
         this.listener = listener;
 
-        detector.SetSensitivity("0.65,0.505");
+        detector.SetSensitivity("0.503");
         detector.SetAudioGain(1);
         detector.ApplyFrontend(true);
         try {
