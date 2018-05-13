@@ -37,21 +37,21 @@ public class RecordingThread {
     private String activeModel_google = strEnvWorkSpace+ACTIVE_UMDL_GOOGLE;
     private String commonRes = strEnvWorkSpace+ACTIVE_RES;   
     
-    private SnowboyDetect detector = new SnowboyDetect(commonRes, activeModel_google);
+    private SnowboyDetect detector = new SnowboyDetect(commonRes, activeModel_alexa);
     private MediaPlayer player = new MediaPlayer();
 
     public RecordingThread(Handler handler, AudioDataReceivedListener listener) {
         this.handler = handler;
         this.listener = listener;
 
-        detector.SetSensitivity("0.503");
+        detector.SetSensitivity("0.6"); //0.505 for google
         detector.SetAudioGain(1);
         detector.ApplyFrontend(true);
         try {
             player.setDataSource(strEnvWorkSpace+"ding.wav");
             player.prepare();
         } catch (IOException e) {
-            Log.e(TAG, "Playing ding sound error", e);
+//            Log.e(TAG, "Playing ding sound error", e);
         }
     }
 
@@ -87,7 +87,7 @@ public class RecordingThread {
 
         while (isRecording){
             SystemClock.sleep(10);
-            Log.v(TAG, "stopRecording: waiting");
+//            Log.v(TAG, "stopRecording: waiting");
         }
 
         thread.interrupt();
@@ -102,7 +102,7 @@ public class RecordingThread {
     }
 
     private void record() {
-        Log.v(TAG, "Start");
+//        Log.v(TAG, "Start");
         android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
 
         // Buffer size in bytes: for 0.1 second of audio
@@ -121,7 +121,7 @@ public class RecordingThread {
             bufferSize);
 
         if (record.getState() != AudioRecord.STATE_INITIALIZED) {
-            Log.e(TAG, "Audio Record can't initialize!");
+//            Log.e(TAG, "Audio Record can't initialize!");
             return;
         }
 
@@ -130,7 +130,7 @@ public class RecordingThread {
         if (null != listener) {
             listener.start();
         }
-        Log.v(TAG, "Start recording");
+//        Log.v(TAG, "Start recording");
 
         long shortsRead = 0;
         detector.Reset();
@@ -147,6 +147,8 @@ public class RecordingThread {
 
             shortsRead += audioData.length;
 
+            if (!shouldContinue) break;
+
             // Snowboy hotword detection.
             int result = detector.RunDetection(audioData, audioData.length);
 
@@ -160,11 +162,11 @@ public class RecordingThread {
                 // sendMessage(MsgEnum.MSG_VAD_SPEECH, null);
             } else if (result > 0) {
                 sendMessage(MsgEnum.MSG_ACTIVE, null);
-                Log.i("Snowboy: ", "Hotword " + Integer.toString(result) + " detected!");
+//                Log.i("[Log] Snowboy: ", "Hotword " + Integer.toString(result) + " detected!");
                 player.start();
             }
         }
         isRecording = false;
-        Log.v(TAG, String.format("Recording stopped. Samples read: %d", shortsRead));
+//        Log.v(TAG, String.format("Recording stopped. Samples read: %d", shortsRead));
     }
 }

@@ -11,28 +11,20 @@ apply plugin: 'android'
 
 dependencies {
     implementation 'com.android.support.constraint:constraint-layout:1.1.0'
-    implementation 'com.android.support:design:25.4.0'
+    implementation 'com.android.support:design:22.2.1'
     compile fileTree(include: '*.jar', dir: 'libs')
     implementation 'com.android.support:multidex:1.0.+'
     implementation 'com.amazonaws:aws-android-sdk-pinpoint:2.6.+'
     implementation 'com.amazonaws:aws-android-sdk-s3:2.6.+'
     implementation 'com.amazonaws:aws-android-sdk-cognito:2.6.+'
-    // Mobile Client for initializing the SDK
     implementation('com.amazonaws:aws-android-sdk-mobile-client:2.6.+@aar') { transitive = true }
-
-    // Cognito UserPools for SignIn
-    implementation 'com.android.support:support-v4:24.+'
     implementation('com.amazonaws:aws-android-sdk-auth-userpools:2.6.+@aar') { transitive = true }
-
-    // Sign in UI Library
-    implementation 'com.android.support:appcompat-v7:24.+'
-    implementation('com.amazonaws:aws-android-sdk-auth-ui:2.6.+@aar') { transitive = true }
 }
 
 android {
     signingConfigs {
     }
-    compileSdkVersion 25
+    compileSdkVersion 22
     buildToolsVersion '27.0.3'
     compileOptions.encoding = 'ISO-8859-1'
     sourceSets {
@@ -64,6 +56,7 @@ android {
     }
     defaultConfig {
         multiDexEnabled = true
+        minSdkVersion 22
     }
     productFlavors {
     }
@@ -71,5 +64,5 @@ android {
 
 repositories {
     google()
-    mavenCentral()
+    jcenter()
 }

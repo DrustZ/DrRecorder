@@ -20,8 +20,7 @@
     <application
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:name="ai.kitt.snowboy.MyApplication"
-        android:theme="@style/AppTheme">
+        android:name="ai.kitt.snowboy.MyApplication">
         <activity
             android:name="ai.kitt.snowboy.Demo"
             android:label="@string/app_name"
@@ -29,7 +28,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
-                <!--<category android:name="android.intent.category.LAUNCHER" />-->
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
@@ -46,16 +45,6 @@
             </intent-filter>
         </receiver>
 
-        <activity
-            android:name="ai.kitt.snowboy.AuthenticatorActivity"
-            android:label="@string/title_activity_authenticator"
-            android:theme="@style/AppTheme.NoActionBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
     </application>
 
 </manifest>

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -103,12 +104,15 @@ public class AudioService extends Service {
                 if (isRecording) {
                     stopRecording(); //this function can change value of mInterval.
                     mFileQueue.add(currentPath);
-                    Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
+                    File fl = new File(currentPath);
+                    int file_size = Integer.parseInt(String.valueOf(fl.length()/1024));
+//                    Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
+//                    Log.d("[Log]", "file "+currentPath+" size: "+String.valueOf(file_size));
 
                     //if active recording mode
                     if (recordBtn_pressed_count > 0) {
                         mFileStatusQueue.add(true);
-                        Log.d("[Log]", "Active recording");
+//                        Log.d("[Log]", "Active recording");
                         conversationStarted = 0;
                         keywordDetected = false;
                         recordBtn_pressed_count -= 1;
@@ -132,7 +136,7 @@ public class AudioService extends Service {
                     else {
                         if (conversationStarted > 0) {
                             //upload the prior three conversation
-                            Log.d("[Log]", "conversation file :"+String.valueOf(conversationStarted));
+//                            Log.d("[Log]", "conversation file :"+String.valueOf(conversationStarted));
                             conversationStarted -= 1;
                             keywordDetected = false;
                             mFileStatusQueue.add(true);
@@ -141,8 +145,12 @@ public class AudioService extends Service {
                         else if (keywordDetected) {
                             conversationStarted = 2;
                             keywordDetected = false;
+                            if (mFileStatusQueue.size() > 0) {
+                                mFileStatusQueue.removeLast();
+                                mFileStatusQueue.add(true);
+                            }
                             mFileStatusQueue.add(true);
-                            Log.d("[Log]", "file detected!!!");
+//                            Log.d("[Log]", "file detected!!!");
                         } else {
                             mFileStatusQueue.add(false);
                         }
@@ -156,6 +164,7 @@ public class AudioService extends Service {
                         } else {
                             File file = new File(uploadpath);
                             file.delete();
+//                            Log.d("[Log]","Delete: "+uploadpath);
                         }
                     }
                 }
@@ -177,20 +186,21 @@ public class AudioService extends Service {
                 case MSG_ACTIVE:
 //                    activeTimes++;
                     keywordDetected = true;
+                    activity.LogTriggerWord(String.format("keyword triggered at " + DateFormat.getDateTimeInstance().format(new Date())));
 //                    Log.d("[Log]"," ----> Detected " + activeTimes + " times");
                     // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
                     break;
                 case MSG_INFO:
-                    Log.d("[Log]"," ----> "+message);
+//                    Log.d("[Log]"," ----> "+message);
                     break;
                 case MSG_VAD_SPEECH:
-                    Log.d("[Log]"," ----> normal voice");
+//                    Log.d("[Log]"," ----> normal voice");
                     break;
                 case MSG_VAD_NOSPEECH:
-                    Log.d("[Log]"," ----> no speech");
+//                    Log.d("[Log]"," ----> no speech");
                     break;
                 case MSG_ERROR:
-                    Log.d("[Log]"," ----> " + msg.toString());
+//                    Log.d("[Log]"," ----> " + msg.toString());
                     break;
                 default:
                     super.handleMessage(msg);
@@ -226,7 +236,7 @@ public class AudioService extends Service {
     }
 
     private void startRecording() {
-        Log.d("[Log]", "startRecording: called!");
+//        Log.d("[Log]", "startRecording: called!");
         isRecording = true;
         currentPath = getOutputFile();
         recordingThread = new RecordingThread(handle, new AudioDataSaver(currentPath));
@@ -289,22 +299,22 @@ public class AudioService extends Service {
     private void setProperVolume() {
         AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         preVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        Log.d("[Log]", " ----> preVolume = "+preVolume);
+//        Log.d("[Log]", " ----> preVolume = "+preVolume);
         int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        Log.d("[Log]"," ----> maxVolume = " + maxVolume);
+//        Log.d("[Log]"," ----> maxVolume = " + maxVolume);
         int properVolume = (int) ((float) maxVolume * 0.2);
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, properVolume, 0);
         int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-        Log.d("[Log]"," ----> currentVolume = "+currentVolume);
+//        Log.d("[Log]"," ----> currentVolume = "+currentVolume);
     }
 
     private void restoreVolume() {
         if(preVolume>=0) {
             AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, preVolume, 0);
-            Log.d("[Log]"," ----> set preVolume = "+preVolume);
+//            Log.d("[Log]"," ----> set preVolume = "+preVolume);
             int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-            Log.d("[Log]"," ----> currentVolume = "+currentVolume);
+//            Log.d("[Log]"," ----> currentVolume = "+currentVolume);
         }
     }
 
@@ -374,7 +384,7 @@ public class AudioService extends Service {
             }
             File file = new File(rawfn);
             file.delete();
-            Log.d("[Log]", "rawToWave: delete the raw file.");
+//            Log.d("[Log]", "rawToWave: delete the raw file.");
         }
     }
     byte[] fullyReadFileToBytes(File f) throws IOException {
@@ -449,7 +459,7 @@ public class AudioService extends Service {
                     // Handle a completed upload.
                     File file = new File(fn);
                     file.delete();
-                    Log.d("Log", "Upload finished!");
+//                    Log.d("Log", "Upload finished!");
                 }
             }
 
@@ -458,8 +468,8 @@ public class AudioService extends Service {
                 float percentDonef = ((float) bytesCurrent / (float) bytesTotal) * 100;
                 int percentDone = (int)percentDonef;
 
-                Log.d("YourActivity", "ID:" + id + " bytesCurrent: " + bytesCurrent
-                        + " bytesTotal: " + bytesTotal + " " + percentDone + "%");
+//                Log.d("YourActivity", "ID:" + id + " bytesCurrent: " + bytesCurrent
+//                        + " bytesTotal: " + bytesTotal + " " + percentDone + "%");
             }
 
             @Override

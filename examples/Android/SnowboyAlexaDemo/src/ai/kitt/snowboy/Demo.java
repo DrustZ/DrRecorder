@@ -14,6 +14,7 @@ import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.text.InputType;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -23,6 +24,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Context;
 
@@ -50,6 +52,7 @@ public class Demo extends Activity {
     private Button admin_button;
     private LinearLayout l_layout;
     private RelativeLayout r_layout;
+    private TextView log_view;
 
     private EditText editText;
     static String strLog = null;
@@ -72,7 +75,7 @@ public class Demo extends Activity {
         AWSMobileClient.getInstance().initialize(this, new AWSStartupHandler() {
             @Override
             public void onComplete(AWSStartupResult awsStartupResult) {
-                Log.d("YourMainActivity", "AWSMobileClient is instantiated and you are connected to AWS!");
+//                Log.d("YourMainActivity", "AWSMobileClient is instantiated and you are connected to AWS!");
                 startRecording();
             }
         }).execute();
@@ -136,8 +139,11 @@ public class Demo extends Activity {
 
         l_layout = (LinearLayout) findViewById(R.id.linearlayout);
         r_layout = (RelativeLayout) findViewById(R.id.titleLinearLayout);
-        l_layout.setVisibility(View.INVISIBLE);
-        r_layout.setVisibility(View.INVISIBLE);
+        l_layout.setVisibility(View.GONE);
+        r_layout.setVisibility(View.GONE);
+
+        log_view = (TextView) findViewById(R.id.logView);
+        log_view.setMovementMethod(new ScrollingMovementMethod());
 
         editText = (EditText) findViewById(R.id.prefixEdit);
         prefix_button = (Button) findViewById(R.id.prefixBtn);
@@ -242,6 +248,14 @@ public class Demo extends Activity {
         active_recording_button.setText("Start Recording");
     }
 
+    public void LogTriggerWord(String s){
+        log_view.setText(log_view.getText()+"\n"+s);
+        final int scrollAmount = log_view.getLayout().getLineTop(log_view.getLineCount()) - log_view.getHeight();
+        if (scrollAmount > 0) {
+            log_view.scrollTo(0, scrollAmount);
+        }
+    }
+
     private void signOut() {
     }
 
@@ -321,14 +335,16 @@ public class Demo extends Activity {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
                 lastDown = System.currentTimeMillis();
             } else if (event.getAction() == MotionEvent.ACTION_UP) {
-                Log.d("[Log]", "onTouch: "+String.valueOf(System.currentTimeMillis() - lastDown));
+//                Log.d("[Log]", "onTouch: "+String.valueOf(System.currentTimeMillis() - lastDown));
                 if (System.currentTimeMillis() - lastDown > 3000) {
                     if (l_layout.getVisibility() == View.VISIBLE){
-                        l_layout.setVisibility(View.INVISIBLE);
-                        r_layout.setVisibility(View.INVISIBLE);
+                        l_layout.setVisibility(View.GONE);
+                        r_layout.setVisibility(View.GONE);
+                        log_view.setVisibility(View.VISIBLE);
                     } else {
                         l_layout.setVisibility(View.VISIBLE);
                         r_layout.setVisibility(View.VISIBLE);
+                        log_view.setVisibility(View.GONE);
                     }
                 }
             }
