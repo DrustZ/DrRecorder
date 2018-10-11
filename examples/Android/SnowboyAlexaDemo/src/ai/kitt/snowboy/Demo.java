@@ -12,6 +12,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.media.AudioManager;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.IBinder;
 import android.text.InputType;
 import android.text.method.ScrollingMovementMethod;
@@ -24,6 +25,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Context;
@@ -34,6 +36,7 @@ import com.amazonaws.mobile.client.AWSStartupResult;
 import com.amazonaws.mobileconnectors.pinpoint.PinpointConfiguration;
 import com.amazonaws.mobileconnectors.pinpoint.PinpointManager;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -41,9 +44,13 @@ import java.util.Date;
 import java.util.Locale;
 
 import ai.kitt.snowboy.demo.R;
+import ai.picovoice.porcupinemanager.KeywordCallback;
+import ai.picovoice.porcupinemanager.PorcupineManager;
+import ai.picovoice.porcupinemanager.PorcupineManagerException;
 
 public class Demo extends Activity {
     public static PinpointManager pinpointManager;
+    private PorcupineManager porcupineManager = null;
     private Button record_button;
     private Button play_button;
     private Button prefix_button;
@@ -75,14 +82,14 @@ public class Demo extends Activity {
         AWSMobileClient.getInstance().initialize(this, new AWSStartupHandler() {
             @Override
             public void onComplete(AWSStartupResult awsStartupResult) {
-//                Log.d("YourMainActivity", "AWSMobileClient is instantiated and you are connected to AWS!");
+                Log.d("YourMainActivity", "AWSMobileClient is instantiated and you are connected to AWS!");
                 startRecording();
             }
         }).execute();
 
         AppResCopy.copyResFromAssetsToSD(this);
 
-        Thread.setDefaultUncaughtExceptionHandler(new MyExceptionHandler(this));
+//        Thread.setDefaultUncaughtExceptionHandler(new MyExceptionHandler(this));
 
         //AWS analytics service
         PinpointConfiguration pinpointConfig = new PinpointConfiguration(
@@ -99,6 +106,25 @@ public class Demo extends Activity {
         pinpointManager.getSessionClient().stopSession();
         pinpointManager.getAnalyticsClient().submitEvents();
 
+    }
+
+    private PorcupineManager initPorcupine() throws PorcupineManagerException {
+
+        // get the keyword file and model parameter file from internal storage.
+        String keywordFilePath = Constants.DEFAULT_WORK_SPACE + "hey_google_android.ppn";
+        String modelFilePath = Constants.DEFAULT_WORK_SPACE + "porcupine_params.pv";
+
+        return new PorcupineManager(modelFilePath, keywordFilePath, 0.5f, new KeywordCallback() {
+            @Override
+            public void run(int keyword_index) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.d("detected!!!!", "detected!!!!!!!!");
+                    }
+                });
+            }
+        });
     }
 
     private ServiceConnection mConnection = new ServiceConnection() {
@@ -229,15 +255,26 @@ public class Demo extends Activity {
 
     private void startRecording() {
         record_started = true;
-        startService(serviceIntent);
-        bindService(serviceIntent, mConnection, Context.BIND_AUTO_CREATE); //Binding to the service!
+        try {
+            porcupineManager = initPorcupine();
+            porcupineManager.start();
+        } catch (PorcupineManagerException e){
+            e.printStackTrace();
+        }
+//        startService(serviceIntent);
+//        bindService(serviceIntent, mConnection, Context.BIND_AUTO_CREATE); //Binding to the service!
         record_button.setText(R.string.btn1_stop);
     }
 
     private void stopRecording() {
         record_started = false;
-        unbindService(mConnection);
-        stopService(serviceIntent);
+        try {
+            porcupineManager.stop();
+        } catch (PorcupineManagerException e){
+            e.printStackTrace();
+        }
+//        unbindService(mConnection);
+//        stopService(serviceIntent);
         record_button.setText(R.string.btn1_start);
     }
 
@@ -336,7 +373,7 @@ public class Demo extends Activity {
                 lastDown = System.currentTimeMillis();
             } else if (event.getAction() == MotionEvent.ACTION_UP) {
 //                Log.d("[Log]", "onTouch: "+String.valueOf(System.currentTimeMillis() - lastDown));
-                if (System.currentTimeMillis() - lastDown > 3000) {
+                if (System.currentTimeMillis() - lastDown > 0) {
                     if (l_layout.getVisibility() == View.VISIBLE){
                         l_layout.setVisibility(View.GONE);
                         r_layout.setVisibility(View.GONE);

@@ -13,6 +13,7 @@ dependencies {
     implementation 'com.android.support.constraint:constraint-layout:1.1.0'
     implementation 'com.android.support:design:22.2.1'
     compile fileTree(include: '*.jar', dir: 'libs')
+    implementation project(':porcupinemanager')
     implementation 'com.android.support:multidex:1.0.+'
     implementation 'com.amazonaws:aws-android-sdk-pinpoint:2.6.+'
     implementation 'com.amazonaws:aws-android-sdk-s3:2.6.+'
@@ -59,6 +60,10 @@ android {
         minSdkVersion 22
     }
     productFlavors {
+    }
+    // Don't compress .ppn and .pv files.
+    aaptOptions {
+        noCompress 'ppn', 'pv'
     }
 }
 
