@@ -37,6 +37,9 @@ import ai.kitt.snowboy.Constants;
 import ai.kitt.snowboy.Demo;
 import ai.kitt.snowboy.MsgEnum;
 import ai.kitt.snowboy.demo.R;
+import ai.picovoice.porcupine.Porcupine;
+import ai.picovoice.porcupine.PorcupineException;
+import ai.picovoice.porcupinemanager.PorcupineManagerException;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
@@ -45,7 +48,7 @@ import com.amazonaws.mobileconnectors.s3.transferutility.*;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 
-public class AudioService extends Service {
+public class AudioService extends Service{
     static String strLog = null;
     Boolean isRecording = Boolean.FALSE;
     Boolean keywordDetected = Boolean.FALSE;
@@ -57,7 +60,7 @@ public class AudioService extends Service {
     private LinkedList<String> mFileQueue = new LinkedList<String>();
     private LinkedList<Boolean> mFileStatusQueue = new LinkedList<Boolean>();
 
-    private int mInterval = 60000; // 5 seconds by default, can be changed later
+    private int mInterval = 10000; // 5 seconds by default, can be changed later
     private Handler mHandler;
     private int preVolume = -1;
     private static long activeTimes = 0;
@@ -68,6 +71,9 @@ public class AudioService extends Service {
     private final IBinder mBinder = new LocalBinder();
     Demo activity;
 
+    private AudioRecorder audioRecorder;
+    private Porcupine porcupine;
+    private AudioConsumer audioConsumer;
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
@@ -106,7 +112,7 @@ public class AudioService extends Service {
                     mFileQueue.add(currentPath);
                     File fl = new File(currentPath);
                     int file_size = Integer.parseInt(String.valueOf(fl.length()/1024));
-//                    Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
+                    Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
 //                    Log.d("[Log]", "file "+currentPath+" size: "+String.valueOf(file_size));
 
                     //if active recording mode
@@ -168,6 +174,7 @@ public class AudioService extends Service {
                         }
                     }
                 }
+                Log.d("[Log]", "here we start again.");
 //                SystemClock.sleep(50);
                 startRecording();
             } finally {
@@ -232,20 +239,46 @@ public class AudioService extends Service {
 
     public void StartRunning(){
         AWSMobileClient.getInstance().initialize(this.activity).execute();
+        try {
+            porcupine = new Porcupine(Constants.DEFAULT_WORK_SPACE+"porcupine_params.pv", Constants.DEFAULT_WORK_SPACE+"hey_google_android.ppn", (float)0.6);
+        } catch (PorcupineException e) {
+            e.printStackTrace();
+        }
+        audioConsumer = new PorcupineAudioConsumer(new KeywordCallback() {
+            @Override
+            public void kwDetected(int keyword_index) {
+                keywordDetected = true;
+                Log.d("[Log]"," ----> Detected !!!" );
+                activity.LogTriggerWord(String.format("keyword triggered at " + DateFormat.getDateTimeInstance().format(new Date())));
+            }
+        });
         mStatusChecker.run();
+//        startRecording();
     }
 
     private void startRecording() {
-//        Log.d("[Log]", "startRecording: called!");
+        Log.d("[Log]", "startRecording: called!");
         isRecording = true;
         currentPath = getOutputFile();
-        recordingThread = new RecordingThread(handle, new AudioDataSaver(currentPath));
-        recordingThread.startRecording();
+        audioRecorder = new AudioRecorder(audioConsumer, new AudioDataSaver(currentPath));
+
+        try {
+            audioRecorder.start();
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+//        recordingThread = new RecordingThread(handle, new AudioDataSaver(currentPath));
+//        recordingThread.startRecording();
     }
 
     private void stopRecording() {
         isRecording = false;
-        recordingThread.stopRecording();
+        try {
+            audioRecorder.stop();
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+//        recordingThread.stopRecording();
     }
 
     public void StartActiveRecording(){
@@ -323,6 +356,9 @@ public class AudioService extends Service {
         super.onDestroy();
         stopRecording();
         restoreVolume();
+        if (porcupine != null){
+            porcupine.delete();
+        }
         mHandler.removeCallbacks(mStatusChecker);
         wakeLock.release();
     }
@@ -478,5 +514,55 @@ public class AudioService extends Service {
             }
 
         });
+    }
+
+    /**
+     * PorcupineAudioConsumer process the raw PCM data returned by {@link AudioRecorder} and
+     * notifies the user by using {@link KeywordCallback}.
+     */
+    public class PorcupineAudioConsumer implements AudioConsumer {
+        private final KeywordCallback keywordCallback;
+
+        /**
+         * Initialize PorcupineAudioConsumer.
+         * @param keywordCallback Callback to use when the keyword is detected.
+         */
+        PorcupineAudioConsumer(KeywordCallback keywordCallback) {
+            this.keywordCallback = keywordCallback;
+        }
+        /**
+         * Consume the raw PCM data and notify user by using {@link KeywordCallback}.
+         * @throws PorcupineManagerException An exception is thrown if there is an error while processing
+         * the PCM data by Porcupine library.
+         */
+        @Override
+        public void consume(short[] pcm) throws PorcupineManagerException {
+            try {
+                final int keyword_index = porcupine.processFrameMultipleKeywords(pcm);
+                if (keyword_index >= 0) {
+                    keywordCallback.kwDetected(keyword_index);
+                }
+            } catch (PorcupineException e) {
+                throw new PorcupineManagerException(e);
+            }
+        }
+
+        /**
+         * Number of audio samples per frame.
+         * @return Number of samples per frame.
+         */
+        @Override
+        public int getFrameLength() {
+            return porcupine.getFrameLength();
+        }
+
+        /**
+         * Number of audio samples per second.
+         * @return Sample rate of the audio data.
+         */
+        @Override
+        public int getSampleRate() {
+            return porcupine.getSampleRate();
+        }
     }
 }

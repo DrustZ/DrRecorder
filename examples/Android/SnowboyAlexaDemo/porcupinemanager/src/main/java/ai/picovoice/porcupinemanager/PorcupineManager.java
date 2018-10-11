@@ -33,7 +33,7 @@ public class PorcupineManager {
      * PorcupineAudioConsumer process the raw PCM data returned by {@link AudioRecorder} and
      * notifies the user by using {@link KeywordCallback}.
      */
-    private class PorcupineAudioConsumer implements AudioConsumer {
+    public class PorcupineAudioConsumer implements AudioConsumer {
         private final KeywordCallback keywordCallback;
 
         /**

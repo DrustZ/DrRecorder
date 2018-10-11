@@ -50,7 +50,6 @@ import ai.picovoice.porcupinemanager.PorcupineManagerException;
 
 public class Demo extends Activity {
     public static PinpointManager pinpointManager;
-    private PorcupineManager porcupineManager = null;
     private Button record_button;
     private Button play_button;
     private Button prefix_button;
@@ -106,25 +105,6 @@ public class Demo extends Activity {
         pinpointManager.getSessionClient().stopSession();
         pinpointManager.getAnalyticsClient().submitEvents();
 
-    }
-
-    private PorcupineManager initPorcupine() throws PorcupineManagerException {
-
-        // get the keyword file and model parameter file from internal storage.
-        String keywordFilePath = Constants.DEFAULT_WORK_SPACE + "hey_google_android.ppn";
-        String modelFilePath = Constants.DEFAULT_WORK_SPACE + "porcupine_params.pv";
-
-        return new PorcupineManager(modelFilePath, keywordFilePath, 0.5f, new KeywordCallback() {
-            @Override
-            public void run(int keyword_index) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Log.d("detected!!!!", "detected!!!!!!!!");
-                    }
-                });
-            }
-        });
     }
 
     private ServiceConnection mConnection = new ServiceConnection() {
@@ -255,26 +235,15 @@ public class Demo extends Activity {
 
     private void startRecording() {
         record_started = true;
-        try {
-            porcupineManager = initPorcupine();
-            porcupineManager.start();
-        } catch (PorcupineManagerException e){
-            e.printStackTrace();
-        }
-//        startService(serviceIntent);
-//        bindService(serviceIntent, mConnection, Context.BIND_AUTO_CREATE); //Binding to the service!
+        startService(serviceIntent);
+        bindService(serviceIntent, mConnection, Context.BIND_AUTO_CREATE); //Binding to the service!
         record_button.setText(R.string.btn1_stop);
     }
 
     private void stopRecording() {
         record_started = false;
-        try {
-            porcupineManager.stop();
-        } catch (PorcupineManagerException e){
-            e.printStackTrace();
-        }
-//        unbindService(mConnection);
-//        stopService(serviceIntent);
+        unbindService(mConnection);
+        stopService(serviceIntent);
         record_button.setText(R.string.btn1_start);
     }
 
