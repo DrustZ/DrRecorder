@@ -36,6 +36,11 @@ public class AudioDataSaver implements AudioDataReceivedListener {
     }
 
     @Override
+    public String getFile(){
+        return saveFile.getPath();
+    }
+
+    @Override
     public void start() {
         Log.d(TAG, "start: save file started!!!~~~~~~~~~~~~~");
         if (null != saveFile) {

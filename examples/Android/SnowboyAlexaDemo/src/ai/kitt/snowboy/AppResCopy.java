@@ -26,6 +26,12 @@ public class AppResCopy {
                 } else {
                      Log.w(TAG, sdcardDstDir+" already exists! ");
                 }
+
+                //delete all previous files
+                if (dir.isDirectory())
+                    for (File child : dir.listFiles())
+                        child.delete();
+
                 for (String fileName : fileNames) {
                     copyFilesFromAssets(context,assetsSrcDir + "/" + fileName,sdcardDstDir+"/"+fileName, override);
                 }

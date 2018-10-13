@@ -9,6 +9,7 @@ import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.security.PublicKey;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,6 +31,7 @@ class AudioRecorder {
     private AtomicBoolean started = new AtomicBoolean(false);
     private AtomicBoolean stop = new AtomicBoolean(false);
     private AtomicBoolean stopped = new AtomicBoolean(false);
+    long tStart = 0;
 
     /**
      * A task to record audio and send the audio samples to Porcupine library for processing.
@@ -54,10 +56,13 @@ class AudioRecorder {
      * Initialize AudioRecorder.
      * @param audioConsumer Consumer for the audio samples recorded by {@link ai.picovoice.porcupinemanager.AudioRecorder}.
      */
-    AudioRecorder(AudioConsumer audioConsumer, AudioDataReceivedListener listener) {
+    AudioRecorder(AudioConsumer audioConsumer) {
         this.audioConsumer = audioConsumer;
         this.sampleRate = audioConsumer.getSampleRate();
         this.frameLength = audioConsumer.getFrameLength();
+    }
+
+    public void setDataListener(AudioDataReceivedListener listener) {
         this.listener = listener;
     }
 
@@ -69,12 +74,12 @@ class AudioRecorder {
         if (started.get()) {
             return;
         }
-
+        stop.set(false);
+        stopped.set(false);
         started.set(true);
         AudioRecorder.RecordTask recordTask = new AudioRecorder.RecordTask();
         ExecutorService recordExecutor = Executors.newSingleThreadExecutor();
         recordExecutor.submit(recordTask);
-
     }
 
     /**
@@ -109,13 +114,14 @@ class AudioRecorder {
         short[] buffer = new short[frameLength];
         AudioRecord record = null;
         try {
+
             record = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate,
                     AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize);
             record.startRecording();
             if (null != listener) {
                 listener.start();
             }
-
+            tStart = System.currentTimeMillis();
             while (!stop.get()) {
                 int r = record.read(buffer, 0, buffer.length);
 
@@ -132,11 +138,22 @@ class AudioRecorder {
                     listener.onAudioDataReceived(audioData, audioData.length);
                 }
             }
+//            long tEnd = System.currentTimeMillis();
+//            long tDelta = tEnd - tStart;
+//            double elapsedSeconds = tDelta / 1000.0;
+//            Log.e(TAG, "stop: time elapsed: " + elapsedSeconds);
             record.stop();
 
         } catch (IllegalArgumentException | IllegalStateException e) {
             throw new PorcupineManagerException(e);
-        } finally {
+        } catch (Exception e) {
+//            long tEnd = System.currentTimeMillis();
+//            long tDelta = tEnd - tStart;
+//            double elapsedSeconds = tDelta / 1000.0;
+//            Log.e(TAG, "[Exception!] stop: time elapsed: " + elapsedSeconds);
+            e.printStackTrace();
+        }
+        finally {
             if (record != null) {
                 record.release();
             }

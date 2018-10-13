@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.PowerManager;
+import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -56,7 +57,6 @@ public class AudioService extends Service{
     int recordBtn_pressed_count = 0; // when user press record actively, maximum 5 minutes
 
     String currentPath = "";
-    String uploadpath = "";
     private LinkedList<String> mFileQueue = new LinkedList<String>();
     private LinkedList<Boolean> mFileStatusQueue = new LinkedList<Boolean>();
 
@@ -66,7 +66,6 @@ public class AudioService extends Service{
     private static long activeTimes = 0;
 
     PowerManager.WakeLock wakeLock;
-    private Runnable runnable;
     private RecordingThread recordingThread;
     private final IBinder mBinder = new LocalBinder();
     Demo activity;
@@ -80,20 +79,6 @@ public class AudioService extends Service{
         setProperVolume();
         activeTimes = 0;
         mHandler = new Handler();
-
-        runnable = new Runnable() {
-            @Override
-            public void run() {
-                //TODO your background code
-                //Add the audio after keyword detected
-                 String wavfn = uploadpath.replace("pcm", "wav");
-                 try {
-                     rawToWave(uploadpath, wavfn);
-                 }catch (Exception e) {
-                     e.printStackTrace();
-                }
-            }
-        };
 
         PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
@@ -112,8 +97,8 @@ public class AudioService extends Service{
                     mFileQueue.add(currentPath);
                     File fl = new File(currentPath);
                     int file_size = Integer.parseInt(String.valueOf(fl.length()/1024));
-                    Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
 //                    Log.d("[Log]", "file "+currentPath+" size: "+String.valueOf(file_size));
+//                    Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
 
                     //if active recording mode
                     if (recordBtn_pressed_count > 0) {
@@ -162,56 +147,30 @@ public class AudioService extends Service{
                         }
                     }
 
+                    //to wav
+                    String fname = mFileQueue.getLast();
+                    ToWavThread ttd = new ToWavThread(fname);
+                    ttd.start();
+                    mFileQueue.remove();
+                    mFileQueue.add(fname.replace("pcm", "wav"));
+
                     if (mFileQueue.size() > 10) {
-                        uploadpath = mFileQueue.remove();
+                        String uploadPath = mFileQueue.remove();
+
                         boolean upload = mFileStatusQueue.remove();
-                        if (upload){
-                            AsyncTask.execute(runnable);
+                        if (upload) {
+                            UploadThread utd = new UploadThread(uploadPath);
+                            utd.start();
                         } else {
-                            File file = new File(uploadpath);
-                            file.delete();
+//                            File file = new File(uploadPath);
+//                            file.delete();
 //                            Log.d("[Log]","Delete: "+uploadpath);
                         }
                     }
                 }
-                Log.d("[Log]", "here we start again.");
-//                SystemClock.sleep(50);
                 startRecording();
             } finally {
-                // 100% guarantee that this always happens, even if
-                // your update method throws an exception
                 mHandler.postDelayed(mStatusChecker, mInterval);
-            }
-        }
-    };
-
-    public Handler handle = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            MsgEnum message = MsgEnum.getMsgEnum(msg.what);
-            switch(message) {
-                case MSG_ACTIVE:
-//                    activeTimes++;
-                    keywordDetected = true;
-                    activity.LogTriggerWord(String.format("keyword triggered at " + DateFormat.getDateTimeInstance().format(new Date())));
-//                    Log.d("[Log]"," ----> Detected " + activeTimes + " times");
-                    // Toast.makeText(Demo.this, "Active "+activeTimes, Toast.LENGTH_SHORT).show();
-                    break;
-                case MSG_INFO:
-//                    Log.d("[Log]"," ----> "+message);
-                    break;
-                case MSG_VAD_SPEECH:
-//                    Log.d("[Log]"," ----> normal voice");
-                    break;
-                case MSG_VAD_NOSPEECH:
-//                    Log.d("[Log]"," ----> no speech");
-                    break;
-                case MSG_ERROR:
-//                    Log.d("[Log]"," ----> " + msg.toString());
-                    break;
-                default:
-                    super.handleMessage(msg);
-                    break;
             }
         }
     };
@@ -252,23 +211,23 @@ public class AudioService extends Service{
                 activity.LogTriggerWord(String.format("keyword triggered at " + DateFormat.getDateTimeInstance().format(new Date())));
             }
         });
+        audioRecorder = new AudioRecorder(audioConsumer);
         mStatusChecker.run();
 //        startRecording();
     }
 
     private void startRecording() {
-        Log.d("[Log]", "startRecording: called!");
+
         isRecording = true;
         currentPath = getOutputFile();
-        audioRecorder = new AudioRecorder(audioConsumer, new AudioDataSaver(currentPath));
+
+        audioRecorder.setDataListener(new AudioDataSaver(currentPath));
 
         try {
             audioRecorder.start();
         } catch (Exception e){
             e.printStackTrace();
         }
-//        recordingThread = new RecordingThread(handle, new AudioDataSaver(currentPath));
-//        recordingThread.startRecording();
     }
 
     private void stopRecording() {
@@ -278,7 +237,6 @@ public class AudioService extends Service{
         } catch (Exception e){
             e.printStackTrace();
         }
-//        recordingThread.stopRecording();
     }
 
     public void StartActiveRecording(){
@@ -416,11 +374,10 @@ public class AudioService extends Service{
         } finally {
             if (output != null) {
                 output.close();
-                uploadWithTransferUtility(wavefn);
             }
             File file = new File(rawfn);
             file.delete();
-//            Log.d("[Log]", "rawToWave: delete the raw file.");
+            Log.d("[Log]", "rawToWave: delete the raw file.");
         }
     }
     byte[] fullyReadFileToBytes(File f) throws IOException {
@@ -491,10 +448,10 @@ public class AudioService extends Service{
 
             @Override
             public void onStateChanged(int id, TransferState state) {
-                if (TransferState.COMPLETED == state) {
+                if (TransferState.COMPLETED == state || TransferState.FAILED == state) {
                     // Handle a completed upload.
-                    File file = new File(fn);
-                    file.delete();
+//                    File file = new File(fn);
+//                    file.delete();
 //                    Log.d("Log", "Upload finished!");
                 }
             }
@@ -511,10 +468,43 @@ public class AudioService extends Service{
             @Override
             public void onError(int id, Exception ex) {
                 // Handle errors
+                ex.printStackTrace();
+//                File file = new File(fn);
+//                file.delete();
             }
 
         });
     }
+
+    class ToWavThread extends Thread {
+        String fname;
+        public ToWavThread(String fname) {
+            this.fname = fname;
+        }
+
+        public void run() {
+            android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_MORE_FAVORABLE);
+            String wavfn = this.fname.replace("pcm", "wav");
+            try {
+                rawToWave(this.fname, wavfn);
+            }catch (Exception e) {
+                e.printStackTrace();
+                File file = new File(this.fname);
+                file.delete();
+            }
+        }
+    }
+
+    class UploadThread extends Thread {
+        String fname;
+        public UploadThread(String fname) {
+            this.fname = fname;
+        }
+
+        public void run() {
+            uploadWithTransferUtility(this.fname);
+        }
+    };
 
     /**
      * PorcupineAudioConsumer process the raw PCM data returned by {@link AudioRecorder} and

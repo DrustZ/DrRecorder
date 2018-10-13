@@ -86,7 +86,7 @@ public class Demo extends Activity {
             }
         }).execute();
 
-        AppResCopy.copyResFromAssetsToSD(this);
+//        AppResCopy.copyResFromAssetsToSD(this);
 
 //        Thread.setDefaultUncaughtExceptionHandler(new MyExceptionHandler(this));
 
@@ -254,12 +254,17 @@ public class Demo extends Activity {
         active_recording_button.setText("Start Recording");
     }
 
-    public void LogTriggerWord(String s){
-        log_view.setText(log_view.getText()+"\n"+s);
-        final int scrollAmount = log_view.getLayout().getLineTop(log_view.getLineCount()) - log_view.getHeight();
-        if (scrollAmount > 0) {
-            log_view.scrollTo(0, scrollAmount);
-        }
+    public void LogTriggerWord(final String s){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                log_view.setText(log_view.getText()+"\n"+s);
+                final int scrollAmount = log_view.getLayout().getLineTop(log_view.getLineCount()) - log_view.getHeight();
+                if (scrollAmount > 0) {
+                    log_view.scrollTo(0, scrollAmount);
+                }
+            }
+        });
     }
 
     private void signOut() {
