@@ -160,8 +160,17 @@ public class AudioService extends Service{
 
                         boolean upload = mFileStatusQueue.remove();
                         if (upload) {
-                            UploadThread utd = new UploadThread(uploadPath);
-                            utd.start();
+                            int idx = 1;
+                            for ( ; idx < mFileStatusQueue.size(); ++idx){
+                                if (mFileStatusQueue.get(idx) == false){
+                                    break;
+                                }
+                            }
+                            String[] tomerge = mFileQueue.subList(0, idx+1).toArray(new String[0]);
+                            mFileStatusQueue.subList(0, idx+1).clear();
+                            mFileQueue.subList(0, idx+1).clear();
+                            MergeThread mtd = new MergeThread(tomerge);
+                            mtd.start();
                         } else {
                             File file = new File(uploadPath);
                             file.delete();
@@ -337,98 +346,6 @@ public class AudioService extends Service{
         return fn;
     }
 
-    private void rawToWave(String rawfn, String wavefn) throws IOException {
-        File rawFile = new File(rawfn);
-        File waveFile = new File(wavefn);
-        byte[] rawData = new byte[(int) rawFile.length()];
-        DataInputStream input = null;
-        try {
-            input = new DataInputStream(new FileInputStream(rawFile));
-            input.read(rawData);
-        } finally {
-            if (input != null) {
-                input.close();
-            }
-        }
-
-        DataOutputStream output = null;
-        try {
-            output = new DataOutputStream(new FileOutputStream(waveFile));
-            // WAVE header
-            // see http://ccrma.stanford.edu/courses/422/projects/WaveFormat/
-            writeString(output, "RIFF"); // chunk id
-            writeInt(output, 36 + rawData.length); // chunk size
-            writeString(output, "WAVE"); // format
-            writeString(output, "fmt "); // subchunk 1 id
-            writeInt(output, 16); // subchunk 1 size
-            writeShort(output, (short) 1); // audio format (1 = PCM)
-            writeShort(output, (short) 1); // number of channels
-            writeInt(output, Constants.SAMPLE_RATE); // sample rate
-            writeInt(output, Constants.SAMPLE_RATE * 2); // byte rate
-            writeShort(output, (short) 2); // block align
-            writeShort(output, (short) 16); // bits per sample
-            writeString(output, "data"); // subchunk 2 id
-            writeInt(output, rawData.length); // subchunk 2 size
-            // Audio data (conversion big endian -> little endian)
-            short[] shorts = new short[rawData.length / 2];
-            ByteBuffer.wrap(rawData).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shorts);
-            ByteBuffer bytes = ByteBuffer.allocate(shorts.length * 2);
-            for (short s : shorts) {
-                bytes.putShort(s);
-            }
-
-            output.write(fullyReadFileToBytes(rawFile));
-        } finally {
-            if (output != null) {
-                output.close();
-            }
-            File file = new File(rawfn);
-            file.delete();
-            Log.d("[Log]", "rawToWave: delete the raw file.");
-        }
-    }
-    byte[] fullyReadFileToBytes(File f) throws IOException {
-        int size = (int) f.length();
-        byte bytes[] = new byte[size];
-        byte tmpBuff[] = new byte[size];
-        FileInputStream fis= new FileInputStream(f);
-        try {
-
-            int read = fis.read(bytes, 0, size);
-            if (read < size) {
-                int remain = size - read;
-                while (remain > 0) {
-                    read = fis.read(tmpBuff, 0, remain);
-                    System.arraycopy(tmpBuff, 0, bytes, size - remain, read);
-                    remain -= read;
-                }
-            }
-        }  catch (IOException e){
-            throw e;
-        } finally {
-            fis.close();
-        }
-
-        return bytes;
-    }
-    private void writeInt(final DataOutputStream output, final int value) throws IOException {
-        output.write(value >> 0);
-        output.write(value >> 8);
-        output.write(value >> 16);
-        output.write(value >> 24);
-    }
-
-    private void writeShort(final DataOutputStream output, final short value) throws IOException {
-        output.write(value >> 0);
-        output.write(value >> 8);
-    }
-
-    private void writeString(final DataOutputStream output, final String value) throws IOException {
-        for (int i = 0; i < value.length(); i++) {
-            output.write(value.charAt(i));
-        }
-    }
-
     //upload
     public void uploadWithTransferUtility(final String fn) {
 
@@ -483,6 +400,42 @@ public class AudioService extends Service{
         });
     }
 
+    class MergeThread extends Thread {
+        String[] fnames;
+        String outpath;
+        public MergeThread(String[] fnames){
+            this.fnames = fnames;
+            outpath = fnames[0].replace(".wav", "-merge.wav");
+        }
+
+        public void run() {
+            AudioMediaOperation.MergeAudios(fnames, outpath, new AudioMediaOperation.OperationCallbacks() {
+                @Override
+                public void onAudioOperationFinished() {
+                    //delete fnames
+                    Log.e("[Log]", "onAudioOperationFinished: Merge Finished!");
+                    for (String s: fnames){
+                        File f = new File(s);
+                        f.delete();
+                    }
+                    //upload outpath
+                    UploadThread ut = new UploadThread(outpath);
+                    ut.start();
+                }
+
+                @Override
+                public void onAudioOperationError(Exception e) {
+                    Log.e("[Log]", "onAudioOperationFinished: Merge Failed...!");
+                    for (String s: fnames){
+                        File f = new File(s);
+                        f.delete();
+                    }
+                }
+            });
+
+        }
+    }
+
     class ToWavThread extends Thread {
         String fname;
         public ToWavThread(String fname) {
@@ -493,7 +446,7 @@ public class AudioService extends Service{
             android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_MORE_FAVORABLE);
             String wavfn = this.fname.replace("pcm", "wav");
             try {
-                rawToWave(this.fname, wavfn);
+                AudioMediaOperation.RawToWave(this.fname, wavfn);
             }catch (Exception e) {
                 e.printStackTrace();
                 File file = new File(this.fname);
