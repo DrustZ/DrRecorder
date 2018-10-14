@@ -56,10 +56,15 @@ public class Demo extends Activity {
     private Button active_recording_button;
     private Button delete_button;
     private Button admin_button;
+    private Button setMode_button;
+    private Button setSense_button;
     private LinearLayout l_layout;
     private RelativeLayout r_layout;
     private TextView log_view;
 
+    private String[] models = new String[] {"Hey google", "OK google"};
+    private int currentModel = 0;
+    private Float sensitivity;
     private EditText editText;
     static String strLog = null;
     private int preVolume = -1;
@@ -86,9 +91,9 @@ public class Demo extends Activity {
             }
         }).execute();
 
-//        AppResCopy.copyResFromAssetsToSD(this);
+        AppResCopy.copyResFromAssetsToSD(this);
 
-//        Thread.setDefaultUncaughtExceptionHandler(new MyExceptionHandler(this));
+        Thread.setDefaultUncaughtExceptionHandler(new MyExceptionHandler(this));
 
         //AWS analytics service
         PinpointConfiguration pinpointConfig = new PinpointConfiguration(
@@ -135,7 +140,12 @@ public class Demo extends Activity {
         record_button = (Button) findViewById(R.id.btn_test1);
         record_button.setOnClickListener(record_button_handle);
         record_button.setEnabled(true);
-        
+
+        setMode_button = (Button) findViewById(R.id.setModel);
+        setMode_button.setOnClickListener(model_button_handle);
+        setSense_button = (Button) findViewById(R.id.setSensitivity);
+        setSense_button.setOnClickListener(sense_button_handle);
+
         play_button = (Button) findViewById(R.id.btn_test2);
         play_button.setOnClickListener(play_button_handle);
         play_button.setEnabled(true);
@@ -224,6 +234,9 @@ public class Demo extends Activity {
         String prefix = prefs.getString("prefix", null);
         if (prefix != null)
             editText.setText(prefix);
+
+        currentModel = prefs.getInt("currentmodel", 0);
+        sensitivity =  prefs.getFloat("sensitivity", 0.5f);
     }
     
     private void setMaxVolume() {
@@ -274,6 +287,68 @@ public class Demo extends Activity {
         try { Thread.sleep(500);
         } catch (Exception e) {}
     }
+
+    private OnClickListener model_button_handle = new OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            if (record_started){
+                return;
+            }
+            new AlertDialog.Builder(Demo.this)
+                    .setSingleChoiceItems(models, currentModel, null)
+                    .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int whichButton) {
+                            dialog.dismiss();
+                            int selectedPosition = ((AlertDialog)dialog).getListView().getCheckedItemPosition();
+                            // Do something useful withe the position of the selected radio button
+                            currentModel = selectedPosition;
+                            SharedPreferences.Editor editor = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE).edit();
+                            editor.putInt("currentmodel", currentModel);
+                            editor.apply();
+                        }
+                    })
+                    .show();
+        }
+    };
+
+    private OnClickListener sense_button_handle = new OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            if (record_started){
+                return;
+            }
+            AlertDialog.Builder alert = new AlertDialog.Builder(Demo.this);
+            final EditText edittext = new EditText(Demo.this);
+            alert.setTitle("Set Sensitivity");
+            edittext.setText(sensitivity.toString());
+            alert.setView(edittext);
+
+            alert.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int whichButton) {
+                    String text = edittext.getText().toString();
+                    try
+                    {
+                        sensitivity = Float.valueOf(text.trim()).floatValue();
+                        SharedPreferences.Editor editor = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE).edit();
+                        editor.putFloat("sensitivity", sensitivity);
+                        editor.apply();
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            });
+
+            alert.setNegativeButton("No Option", new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int whichButton) {
+                    // what ever you want to do with No option.
+                }
+            });
+
+            alert.show();
+        }
+    };
     
     private OnClickListener record_button_handle = new OnClickListener() {
         // @Override

@@ -151,10 +151,11 @@ public class AudioService extends Service{
                     String fname = mFileQueue.getLast();
                     ToWavThread ttd = new ToWavThread(fname);
                     ttd.start();
-                    mFileQueue.remove();
+                    mFileQueue.removeLast();
                     mFileQueue.add(fname.replace("pcm", "wav"));
+                    Log.d("[Log]", "file quue: "+mFileQueue.getLast());
 
-                    if (mFileQueue.size() > 10) {
+                    if (mFileQueue.size() > 5) {
                         String uploadPath = mFileQueue.remove();
 
                         boolean upload = mFileStatusQueue.remove();
@@ -162,9 +163,9 @@ public class AudioService extends Service{
                             UploadThread utd = new UploadThread(uploadPath);
                             utd.start();
                         } else {
-//                            File file = new File(uploadPath);
-//                            file.delete();
-//                            Log.d("[Log]","Delete: "+uploadpath);
+                            File file = new File(uploadPath);
+                            file.delete();
+                            Log.d("[Log]","Delete: "+uploadPath);
                         }
                     }
                 }
@@ -198,8 +199,14 @@ public class AudioService extends Service{
 
     public void StartRunning(){
         AWSMobileClient.getInstance().initialize(this.activity).execute();
+        SharedPreferences prefs = getSharedPreferences(Constants.MY_PREFERENCE, MODE_PRIVATE);
+        String modelname = Constants.DEFAULT_WORK_SPACE + "hey_google_android.ppn";
+        if (prefs.getInt("currentmodel", 0) == 1){
+            modelname = Constants.DEFAULT_WORK_SPACE + "ok_google_android.ppn";
+        }
+        float sensitivity =  prefs.getFloat("sensitivity", 0.5f);
         try {
-            porcupine = new Porcupine(Constants.DEFAULT_WORK_SPACE+"porcupine_params.pv", Constants.DEFAULT_WORK_SPACE+"hey_google_android.ppn", (float)0.6);
+            porcupine = new Porcupine(Constants.DEFAULT_WORK_SPACE+"porcupine_params.pv", modelname, sensitivity);
         } catch (PorcupineException e) {
             e.printStackTrace();
         }
