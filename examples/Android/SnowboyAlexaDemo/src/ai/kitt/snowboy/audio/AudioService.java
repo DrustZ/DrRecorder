@@ -66,7 +66,7 @@ public class AudioService extends Service{
     private static long activeTimes = 0;
 
     PowerManager.WakeLock wakeLock;
-    private RecordingThread recordingThread;
+//    private RecordingThread recordingThread;
     private final IBinder mBinder = new LocalBinder();
     Demo activity;
 
