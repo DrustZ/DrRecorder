@@ -93,7 +93,7 @@ public class Demo extends Activity {
 
         AppResCopy.copyResFromAssetsToSD(this);
 
-        Thread.setDefaultUncaughtExceptionHandler(new MyExceptionHandler(this));
+//        Thread.setDefaultUncaughtExceptionHandler(new MyExceptionHandler(this));
 
         //AWS analytics service
         PinpointConfiguration pinpointConfig = new PinpointConfiguration(

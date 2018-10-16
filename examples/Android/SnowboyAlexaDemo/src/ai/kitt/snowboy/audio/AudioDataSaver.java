@@ -42,7 +42,7 @@ public class AudioDataSaver implements AudioDataReceivedListener {
 
     @Override
     public void start() {
-        Log.d(TAG, "start: save file started!!!~~~~~~~~~~~~~");
+//        Log.d(TAG, "start: save file started!!!~~~~~~~~~~~~~");
         if (null != saveFile) {
             if (saveFile.exists()) {
                 saveFile.delete();

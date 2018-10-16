@@ -60,7 +60,7 @@ public class AudioService extends Service{
     private LinkedList<String> mFileQueue = new LinkedList<String>();
     private LinkedList<Boolean> mFileStatusQueue = new LinkedList<Boolean>();
 
-    private int mInterval = 10000; // 5 seconds by default, can be changed later
+    private int mInterval = 60000; // 5 seconds by default, can be changed later
     private Handler mHandler;
     private int preVolume = -1;
     private static long activeTimes = 0;
@@ -95,8 +95,8 @@ public class AudioService extends Service{
                 if (isRecording) {
                     stopRecording(); //this function can change value of mInterval.
                     mFileQueue.add(currentPath);
-                    File fl = new File(currentPath);
-                    int file_size = Integer.parseInt(String.valueOf(fl.length()/1024));
+//                    File fl = new File(currentPath);
+//                    int file_size = Integer.parseInt(String.valueOf(fl.length()/1024));
 //                    Log.d("[Log]", "file "+currentPath+" size: "+String.valueOf(file_size));
 //                    Log.d("[Log]", "record stop. Now queue size:" + String.valueOf(mFileQueue.size()));
 
@@ -134,14 +134,13 @@ public class AudioService extends Service{
                         }
                         // keyword recognized
                         else if (keywordDetected) {
-                            conversationStarted = 2;
+//                            conversationStarted = 2;
                             keywordDetected = false;
-                            if (mFileStatusQueue.size() > 0) {
-                                mFileStatusQueue.removeLast();
-                                mFileStatusQueue.add(true);
-                            }
+//                            if (mFileStatusQueue.size() > 0) {
+//                                mFileStatusQueue.removeLast();
+//                                mFileStatusQueue.add(true);
+//                            }
                             mFileStatusQueue.add(true);
-//                            Log.d("[Log]", "file detected!!!");
                         } else {
                             mFileStatusQueue.add(false);
                         }
@@ -153,28 +152,32 @@ public class AudioService extends Service{
                     ttd.start();
                     mFileQueue.removeLast();
                     mFileQueue.add(fname.replace("pcm", "wav"));
-                    Log.d("[Log]", "file quue: "+mFileQueue.getLast());
 
                     if (mFileQueue.size() > 5) {
-                        String uploadPath = mFileQueue.remove();
-
-                        boolean upload = mFileStatusQueue.remove();
+                        String uploadPath = mFileQueue.getFirst();
+                        boolean upload = mFileStatusQueue.getFirst();
                         if (upload) {
-                            int idx = 1;
-                            for ( ; idx < mFileStatusQueue.size(); ++idx){
-                                if (mFileStatusQueue.get(idx) == false){
-                                    break;
-                                }
-                            }
-                            String[] tomerge = mFileQueue.subList(0, idx+1).toArray(new String[0]);
-                            mFileStatusQueue.subList(0, idx+1).clear();
-                            mFileQueue.subList(0, idx+1).clear();
-                            MergeThread mtd = new MergeThread(tomerge);
-                            mtd.start();
+//                            int idx = 1;
+//                            for ( ; idx < mFileStatusQueue.size(); ++idx){
+//                                if (mFileStatusQueue.get(idx) == false){
+//                                    break;
+//                                }
+//                            }
+//                            String[] tomerge = mFileQueue.subList(0, idx+1).toArray(new String[0]);
+//                            mFileStatusQueue.subList(0, idx+1).clear();
+//                            mFileQueue.subList(0, idx+1).clear();
+//                            MergeThread mtd = new MergeThread(tomerge);
+//                            mtd.start();
+                            mFileQueue.remove();
+                            mFileStatusQueue.remove();
+                            UploadThread ut = new UploadThread(uploadPath);
+                            ut.start();
                         } else {
+                            mFileQueue.remove();
+                            mFileStatusQueue.remove();
                             File file = new File(uploadPath);
                             file.delete();
-                            Log.d("[Log]","Delete: "+uploadPath);
+//                            Log.d("[Log]","Delete: "+uploadPath);
                         }
                     }
                 }
@@ -374,8 +377,8 @@ public class AudioService extends Service{
             public void onStateChanged(int id, TransferState state) {
                 if (TransferState.COMPLETED == state || TransferState.FAILED == state) {
                     // Handle a completed upload.
-//                    File file = new File(fn);
-//                    file.delete();
+                    File file = new File(fn);
+                    file.delete();
 //                    Log.d("Log", "Upload finished!");
                 }
             }
@@ -393,8 +396,8 @@ public class AudioService extends Service{
             public void onError(int id, Exception ex) {
                 // Handle errors
                 ex.printStackTrace();
-//                File file = new File(fn);
-//                file.delete();
+                File file = new File(fn);
+                file.delete();
             }
 
         });
@@ -449,6 +452,8 @@ public class AudioService extends Service{
                 AudioMediaOperation.RawToWave(this.fname, wavfn);
             }catch (Exception e) {
                 e.printStackTrace();
+            } finally {
+//                Log.e("[Log]", "wav: "+fname+" to "+wavfn);
                 File file = new File(this.fname);
                 file.delete();
             }
